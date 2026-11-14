@@ -1,0 +1,49 @@
+{
+  "fatura_no": "NLS2026000000137",
+  "ettn": "3f2c9a4e-8b1d-4c6f-9a2e-71d5b0c4e8f1",
+  "fatura_tarihi": "12.10.2026",
+  "vade_tarihi": "11.11.2026",
+  "para_birimi": "TL",
+  "satici": {
+    "unvan": "Nilüfer Lojistik A.Ş.",
+    "vkn": "7310045825",
+    "iban": "TR33 0006 1005 1978 6457 8413 26",
+    "ulke": "Türkiye"
+  },
+  "alici": {
+    "unvan": "Ege Tekstil Ltd. Şti.",
+    "vkn": "2688154098",
+    "ulke": "Türkiye"
+  },
+  "kalemler": [
+    {
+      "aciklama": "Konteyner taşıma (İzmir–Bursa)",
+      "miktar": 3,
+      "birim_fiyat": "18.500,00",
+      "tutar": "55.500,00",
+      "kdv_orani": "%20"
+    },
+    {
+      "aciklama": "Depolama (palet × gün)",
+      "miktar": 240,
+      "birim_fiyat": "42,50",
+      "tutar": "10.200,00",
+      "kdv_orani": "%20"
+    },
+    {
+      "aciklama": "Gümrük müşavirlik hizmeti",
+      "miktar": 1,
+      "birim_fiyat": "7.500,00",
+      "tutar": "7.500,00",
+      "kdv_orani": "%18"
+    }
+  ],
+  "mal_hizmet_toplam_tutari": "73.200,00",
+  "hesaplanan_kdv": "14.640,00",
+  "tevkifat": {
+    "oran": "2/10",
+    "tutar": "2.928,00"
+  },
+  "vergiler_dahil_toplam_tutar": "87.840,00",
+  "odenecek_tutar": "87.840,00"
+}

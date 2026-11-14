@@ -1,0 +1,52 @@
+{
+  "invoice_number": "RE-2026-0418",
+  "invoice_date": "2026-11-03",
+  "due_date": "2026-12-03",
+  "currency": "EUR",
+  "seller": {
+    "name": "Nordlicht Studio GmbH",
+    "vat_id": "DE136695976",
+    "iban": "DE89 3704 0044 O532 0130 00",
+    "country": "DE",
+    "address": "Speicherstraße 12, 20457 Hamburg"
+  },
+  "buyer": {
+    "name": "Atelier Brune SARL",
+    "vat_id": "FR40303265045",
+    "country": "FR"
+  },
+  "line_items": [
+    {
+      "description": "Brand workshop (2 days)",
+      "quantity": 2,
+      "unit_price": 1450,
+      "amount": 2900,
+      "vat_rate": 19
+    },
+    {
+      "description": "Logo system and guidelines",
+      "quantity": 1,
+      "unit_price": 3200,
+      "amount": 3200,
+      "vat_rate": 19
+    },
+    {
+      "description": "Photography licence, 12 images",
+      "quantity": 12,
+      "unit_price": 102.5,
+      "amount": 1.23,
+      "vat_rate": 19
+    },
+    {
+      "description": "Print production, 500 brochures",
+      "quantity": 500,
+      "unit_price": 1.84,
+      "amount": 920,
+      "vat_rate": 19
+    }
+  ],
+  "subtotal": 8250,
+  "tax_total": 1576.5,
+  "total": 9817.5,
+  "amount_due": 9817.5
+}
