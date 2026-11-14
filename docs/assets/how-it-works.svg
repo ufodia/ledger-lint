@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="t d">
+  <title id="t">How Ledger Lint checks an extraction</title>
+  <desc id="d">Four steps. Map: plain LLM JSON, Azure Document Intelligence and Google Document AI results, with English, German or Turkish field names and either number format, become one canonical invoice. Check: arithmetic, VAT rules by country and date, identifiers and dates. Diagnose: each mismatch is matched against error signatures such as a factor of 1,000, transposed digits, OCR confusions, gross taken for net or a value copied from another field. Report: a verdict, the rebuilt invoice with marked fields, a correction prompt for the model, Markdown, CSV and JSON reports and a command-line exit code.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0l10 5-10 5z" fill="#8ab4ff"/></marker>
+    <style>
+      .k{font:700 12px 'Segoe UI',Helvetica,Arial,sans-serif;letter-spacing:2px;fill:#8ab4ff}
+      .h{font:600 22px 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;fill:#e9f0ff}
+      .s{font:13.5px 'Segoe UI',Helvetica,Arial,sans-serif;fill:#9fb0cc}
+      .m{font:12px 'Cascadia Mono',Consolas,Menlo,monospace;fill:#cfdaf2}
+      .card{fill:#14223a;stroke:#d0e0ff;stroke-opacity:.1}
+      .chip{font:600 12.5px 'Segoe UI',Helvetica,Arial,sans-serif}
+    </style>
+  </defs>
+  <rect width="1200" height="600" rx="24" fill="#0b1422"/>
+  <text x="48" y="62" class="k">HOW LEDGER LINT CHECKS AN EXTRACTION</text>
+  <text x="48" y="98" font-family="Iowan Old Style,Palatino Linotype,Palatino,Georgia,serif" font-size="30" font-weight="600" fill="#e9f0ff">Every number is checked against the others — and every mismatch gets a reason</text>
+
+  <!-- Step 1 -->
+  <rect class="card" x="48" y="132" width="255" height="300" rx="18"/>
+  <text x="72" y="168" class="k">1 · MAP</text>
+  <text x="72" y="198" class="h">Any extraction</text>
+  <text class="s"><tspan x="72" y="226">One canonical invoice, whatever</tspan><tspan x="72" y="246">produced the JSON. Each value</tspan><tspan x="72" y="266">remembers its source path.</tspan></text>
+  <g class="chip">
+    <rect x="72" y="286" width="207" height="26" rx="8" fill="#8ab4ff" fill-opacity=".12"/><text x="84" y="304" fill="#bcd2ff">LLM JSON · EN / DE / TR keys</text>
+    <rect x="72" y="318" width="207" height="26" rx="8" fill="#8ab4ff" fill-opacity=".12"/><text x="84" y="336" fill="#bcd2ff">Azure prebuilt-invoice</text>
+    <rect x="72" y="350" width="207" height="26" rx="8" fill="#8ab4ff" fill-opacity=".12"/><text x="84" y="368" fill="#bcd2ff">Google Document AI</text>
+    <rect x="72" y="382" width="207" height="26" rx="8" fill="#8ab4ff" fill-opacity=".12"/><text x="84" y="400" fill="#bcd2ff">1,234.56 · 1.234,56 · %20</text>
+  </g>
+
+  <!-- Step 2 -->
+  <rect class="card" x="327" y="132" width="255" height="300" rx="18"/>
+  <text x="351" y="168" class="k">2 · CHECK</text>
+  <text x="351" y="198" class="h">Four families</text>
+  <g class="s">
+    <text x="351" y="232" fill="#e9f0ff" font-weight="650">Arithmetic</text>
+    <text x="351" y="251">qty × price, subtotal, VAT, total, due</text>
+    <text x="351" y="281" fill="#e9f0ff" font-weight="650">Tax</text>
+    <text x="351" y="300">rates by country on the invoice date,</text>
+    <text x="351" y="318">KDV tevkifatı, reverse charge</text>
+    <text x="351" y="348" fill="#e9f0ff" font-weight="650">Identifiers</text>
+    <text x="351" y="367">IBAN, EU VAT, VKN / TCKN, ETTN</text>
+    <text x="351" y="397" fill="#e9f0ff" font-weight="650">Dates</text>
+    <text x="351" y="416">impossible, ambiguous, swapped</text>
+  </g>
+
+  <!-- Step 3 -->
+  <rect class="card" x="606" y="132" width="282" height="300" rx="18"/>
+  <text x="630" y="168" class="k">3 · DIAGNOSE</text>
+  <text x="630" y="198" class="h">Error signatures</text>
+  <g class="m">
+    <rect x="630" y="214" width="236" height="30" rx="8" fill="#0a1220"/>
+    <text x="642" y="234">1,230.00 → <tspan fill="#ff8f8f">1.23</tspan>  ×1,000</text>
+    <rect x="630" y="250" width="236" height="30" rx="8" fill="#0a1220"/>
+    <text x="642" y="270">1,5<tspan fill="#ff8f8f">67</tspan>.50 → 1,5<tspan fill="#ff8f8f">76</tspan>.50  swap</text>
+    <rect x="630" y="286" width="236" height="30" rx="8" fill="#0a1220"/>
+    <text x="642" y="306">1<tspan fill="#ff8f8f">3</tspan> → 1<tspan fill="#ff8f8f">8</tspan>  OCR 3↔8</text>
+    <rect x="630" y="322" width="236" height="30" rx="8" fill="#0a1220"/>
+    <text x="642" y="342">100.00 → <tspan fill="#ff8f8f">119.00</tspan>  gross</text>
+    <rect x="630" y="358" width="236" height="30" rx="8" fill="#0a1220"/>
+    <text x="642" y="378">…44 <tspan fill="#ff8f8f">O</tspan>532… → …44 0532…  IBAN</text>
+    <rect x="630" y="394" width="236" height="30" rx="8" fill="#0a1220"/>
+    <text x="642" y="414">18% → 20%  rate in force</text>
+  </g>
+
+  <!-- Step 4 -->
+  <rect class="card" x="912" y="132" width="240" height="300" rx="18"/>
+  <text x="936" y="168" class="k">4 · REPORT</text>
+  <text x="936" y="198" class="h">Act on it</text>
+  <g class="chip">
+    <rect x="936" y="216" width="192" height="28" rx="14" fill="#ff6b6b" fill-opacity=".16"/><text x="1032" y="235" text-anchor="middle" fill="#ff9a9a">Does not add up</text>
+    <rect x="936" y="250" width="192" height="28" rx="14" fill="#ffc35c" fill-opacity=".16"/><text x="1032" y="269" text-anchor="middle" fill="#ffd690">Check the warnings</text>
+    <rect x="936" y="284" width="192" height="28" rx="14" fill="#5fd39a" fill-opacity=".16"/><text x="1032" y="303" text-anchor="middle" fill="#9fe8c4">Adds up</text>
+  </g>
+  <text class="s"><tspan x="936" y="340">Rebuilt invoice with marks,</tspan><tspan x="936" y="360">a correction prompt for the</tspan><tspan x="936" y="380">model, Markdown · CSV · JSON,</tspan><tspan x="936" y="400">and CLI exit codes for CI.</tspan></text>
+
+  <g stroke="#8ab4ff" stroke-width="2.2" fill="none" marker-end="url(#arrow)">
+    <path d="M305 282h18"/><path d="M584 282h18"/><path d="M890 282h18"/>
+  </g>
+
+  <!-- Cascade note -->
+  <rect x="48" y="456" width="1104" height="104" rx="18" fill="#14223a" stroke="#8ab4ff" stroke-opacity=".35"/>
+  <text x="72" y="490" class="k">NO CASCADES</text>
+  <text x="72" y="518" class="s" fill="#e9f0ff" font-size="15">One misread line would break the subtotal, the VAT and the total. Ledger Lint re-checks each total with the corrected value</text>
+  <text x="72" y="540" class="s" fill="#e9f0ff" font-size="15">and reports the error once, where it is: <tspan class="m" font-size="13" fill="#9fb0cc">“The subtotal is consistent once line 3 is corrected.”</tspan></text>
+</svg>

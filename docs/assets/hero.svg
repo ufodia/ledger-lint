@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="600" viewBox="0 0 1280 600" role="img" aria-labelledby="t d">
+  <title id="t">Ledger Lint</title>
+  <desc id="d">Prove the numbers an AI pulled from an invoice add up. An invoice rebuilt from extracted JSON shows three marked values: line 3 was read as 1.23 instead of 1,230.00, the VAT total has two digits transposed, and the IBAN contains the letter O instead of a zero. Cards on the right explain each cause.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14223a"/>
+      <stop offset=".6" stop-color="#0d1728"/>
+      <stop offset="1" stop-color="#091120"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#8ab4ff" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#8ab4ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="strip" x1="0" x2="1">
+      <stop offset="0" stop-color="#6d8dff"/>
+      <stop offset="1" stop-color="#8ab4ff"/>
+    </linearGradient>
+    <pattern id="rules" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M0 31.5h32" stroke="#8ab4ff" stroke-opacity=".05"/>
+    </pattern>
+    <filter id="shadow" x="-15%" y="-10%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+    <style>
+      .ui{font-family:'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif}
+      .serif{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif}
+      .mono{font-family:'Cascadia Mono',Consolas,'SF Mono',Menlo,monospace}
+      .row{font:13px 'Segoe UI',Helvetica,Arial,sans-serif;fill:#1c2434}
+      .num{font:12.5px 'Cascadia Mono',Consolas,Menlo,monospace;fill:#1c2434}
+      .th{font:700 9.5px 'Segoe UI',Helvetica,Arial,sans-serif;letter-spacing:1.4px;fill:#6b7280}
+    </style>
+  </defs>
+
+  <rect width="1280" height="600" fill="url(#bg)"/>
+  <rect width="1280" height="600" fill="url(#rules)"/>
+  <circle cx="900" cy="280" r="430" fill="url(#glow)"/>
+
+  <!-- Left: brand and promise -->
+  <g transform="translate(70 128)">
+    <rect width="64" height="64" rx="15" fill="#0f1a2c" stroke="#8ab4ff" stroke-opacity=".35"/>
+    <rect x="13" y="8" width="34" height="44" rx="5" fill="none" stroke="#8ab4ff" stroke-width="3.4"/>
+    <path d="M20 20h20M20 28h20M20 36h11" stroke="#8ab4ff" stroke-width="3" stroke-linecap="round" opacity=".65"/>
+    <circle cx="46" cy="46" r="12" fill="#0f1a2c" stroke="#5fd39a" stroke-width="3.4"/>
+    <path d="M40.5 46.3l3.8 3.8 7-7.6" fill="none" stroke="#5fd39a" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="70" y="244" class="ui" font-size="14" font-weight="700" letter-spacing="4" fill="#8ab4ff">INVOICE ARITHMETIC CHECKS</text>
+  <text x="66" y="318" class="serif" font-size="76" font-weight="600" fill="#e9f0ff">Ledger Lint</text>
+  <text x="70" y="368" class="ui" font-size="26" fill="#cbd7ee">Prove the numbers an AI pulled</text>
+  <text x="70" y="402" class="ui" font-size="26" fill="#cbd7ee">from an invoice add up.</text>
+  <g class="ui" font-size="14.5" font-weight="650">
+    <rect x="70" y="436" width="146" height="34" rx="17" fill="#ff6b6b" fill-opacity=".14" stroke="#ff6b6b" stroke-opacity=".5"/>
+    <text x="143" y="458" text-anchor="middle" fill="#ffa3a3">1,000× too small</text>
+    <rect x="226" y="436" width="156" height="34" rx="17" fill="#ff6b6b" fill-opacity=".14" stroke="#ff6b6b" stroke-opacity=".5"/>
+    <text x="304" y="458" text-anchor="middle" fill="#ffa3a3">Transposed digits</text>
+    <rect x="392" y="436" width="128" height="34" rx="17" fill="#ffc35c" fill-opacity=".14" stroke="#ffc35c" stroke-opacity=".5"/>
+    <text x="456" y="458" text-anchor="middle" fill="#ffd690">OCR: O → 0</text>
+  </g>
+  <text x="70" y="514" class="ui" font-size="16" fill="#8798b6">LLM · Azure · Google output  ·  EU &amp; Türkiye rules  ·  runs in your browser</text>
+
+  <!-- Paper -->
+  <g filter="url(#shadow)">
+    <rect x="640" y="56" width="406" height="488" rx="6" fill="#fbfaf6"/>
+  </g>
+  <path d="M646 56h394a6 6 0 0 1 6 6v2H640v-2a6 6 0 0 1 6-6z" fill="url(#strip)"/>
+  <text x="664" y="102" class="serif" font-size="17" font-weight="600" fill="#1c2434">Nordlicht Studio GmbH</text>
+  <text x="664" y="120" class="ui" font-size="11" fill="#6b7280">Speicherstraße 12, 20457 Hamburg</text>
+  <text x="664" y="136" class="ui" font-size="11" fill="#3f4757">VAT ID <tspan class="mono" font-size="10.5">DE136695976</tspan></text>
+  <text x="1022" y="104" text-anchor="end" class="serif" font-size="24" font-weight="600" fill="#1c2434">Invoice</text>
+  <text x="1022" y="122" text-anchor="end" class="ui" font-size="11" fill="#6b7280">RE-2026-0418 · 3 Nov 2026</text>
+
+  <!-- IBAN line with the O -->
+  <text x="664" y="156" class="ui" font-size="11" fill="#3f4757">IBAN</text>
+  <rect x="694" y="144" width="190" height="17" rx="3" fill="#e5484d" fill-opacity=".14"/>
+  <path d="M694 161h190" stroke="#e5484d" stroke-width="2"/>
+  <text x="698" y="156" class="mono" font-size="10.5" fill="#1c2434">DE89 3704 0044 <tspan fill="#e5484d" font-weight="700">O</tspan>532 0130 00</text>
+  <circle cx="892" cy="148" r="8" fill="#e5484d"/><text x="892" y="151.5" text-anchor="middle" class="ui" font-size="10" font-weight="800" fill="#fff">3</text>
+
+  <path d="M664 178h358" stroke="#1c2434" stroke-width="2"/>
+
+  <!-- Lines -->
+  <text x="664" y="200" class="th">DESCRIPTION</text>
+  <text x="878" y="200" text-anchor="end" class="th">QTY</text>
+  <text x="952" y="200" text-anchor="end" class="th">PRICE</text>
+  <text x="1022" y="200" text-anchor="end" class="th">AMOUNT</text>
+  <path d="M664 208h358" stroke="#1c2434" stroke-opacity=".6"/>
+  <g>
+    <text x="664" y="232" class="row">Brand workshop</text>
+    <text x="878" y="232" text-anchor="end" class="num">2</text><text x="952" y="232" text-anchor="end" class="num">1,450.00</text><text x="1022" y="232" text-anchor="end" class="num">2,900.00</text>
+    <path d="M664 244h358" stroke="#e6e2d8"/>
+    <text x="664" y="266" class="row">Logo system</text>
+    <text x="878" y="266" text-anchor="end" class="num">1</text><text x="952" y="266" text-anchor="end" class="num">3,200.00</text><text x="1022" y="266" text-anchor="end" class="num">3,200.00</text>
+    <path d="M664 278h358" stroke="#e6e2d8"/>
+    <text x="664" y="300" class="row">Photography licence</text>
+    <text x="878" y="300" text-anchor="end" class="num">12</text><text x="952" y="300" text-anchor="end" class="num">102.50</text>
+    <rect x="972" y="284" width="54" height="22" rx="3" fill="#e5484d" fill-opacity=".16"/>
+    <path d="M972 306h54" stroke="#e5484d" stroke-width="2.2"/>
+    <text x="1022" y="300" text-anchor="end" class="num" font-weight="700" fill="#c4262c">1.23</text>
+    <circle cx="1032" cy="284" r="8" fill="#e5484d"/><text x="1032" y="287.5" text-anchor="middle" class="ui" font-size="10" font-weight="800" fill="#fff">1</text>
+    <path d="M664 312h358" stroke="#e6e2d8"/>
+    <text x="664" y="334" class="row">Print production</text>
+    <text x="878" y="334" text-anchor="end" class="num">500</text><text x="952" y="334" text-anchor="end" class="num">1.84</text><text x="1022" y="334" text-anchor="end" class="num">920.00</text>
+    <path d="M664 346h358" stroke="#e6e2d8"/>
+  </g>
+
+  <!-- Sums -->
+  <g>
+    <text x="846" y="378" class="row" fill="#3f4757">Subtotal</text>
+    <text x="1022" y="378" text-anchor="end" class="num">8,250.00</text>
+    <text x="846" y="406" class="row" fill="#3f4757">VAT 19%</text>
+    <rect x="950" y="390" width="76" height="22" rx="3" fill="#e5484d" fill-opacity=".16"/>
+    <path d="M950 412h76" stroke="#e5484d" stroke-width="2.2"/>
+    <text x="1022" y="406" text-anchor="end" class="num" font-weight="700" fill="#c4262c">1,576.50</text>
+    <circle cx="1032" cy="390" r="8" fill="#e5484d"/><text x="1032" y="393.5" text-anchor="middle" class="ui" font-size="10" font-weight="800" fill="#fff">2</text>
+    <path d="M846 424h176" stroke="#e6e2d8"/>
+    <text x="846" y="446" class="row" font-weight="700">Total</text>
+    <text x="1022" y="446" text-anchor="end" class="num" font-weight="700">9,817.50</text>
+  </g>
+  <path d="M664 500h358" stroke="#e6e2d8" stroke-dasharray="4 4"/>
+  <text x="664" y="522" class="ui" font-size="10.5" fill="#6b7280">Rebuilt from the extracted JSON — not the original document</text>
+
+  <!-- JSON card -->
+  <g filter="url(#shadow)">
+    <rect x="566" y="378" width="250" height="114" rx="14" fill="#0a1220" stroke="#8ab4ff" stroke-opacity=".3"/>
+  </g>
+  <g class="mono" font-size="12.5">
+    <text x="584" y="404" fill="#7f91b0">"line_items"[2]: {</text>
+    <text x="598" y="426" fill="#cfdaf2">"quantity": <tspan fill="#ffc35c">12</tspan>,</text>
+    <text x="598" y="446" fill="#cfdaf2">"unit_price": <tspan fill="#ffc35c">102.5</tspan>,</text>
+    <rect x="594" y="452" width="132" height="22" rx="4" fill="#ff6b6b" fill-opacity=".18"/>
+    <text x="598" y="468" fill="#cfdaf2">"amount": <tspan fill="#ff8f8f" font-weight="700">1.23</tspan></text>
+    <text x="584" y="486" fill="#7f91b0">}</text>
+  </g>
+
+  <!-- Finding cards -->
+  <g class="ui">
+    <rect x="1062" y="196" width="190" height="122" rx="14" fill="#1a1d2c" stroke="#ff6b6b" stroke-opacity=".7"/>
+    <circle cx="1082" cy="218" r="9" fill="#ff6b6b"/><text x="1082" y="222" text-anchor="middle" font-size="11" font-weight="800" fill="#0b1422">1</text>
+    <text x="1098" y="222" font-size="10.5" font-weight="800" letter-spacing="1.4" fill="#ff8f8f">LINE 3 AMOUNT</text>
+    <text x="1076" y="246" class="mono" font-size="12" fill="#e9f0ff">12 × 102.50 = 1,230.00</text>
+    <text x="1076" y="270" font-size="12.5" font-weight="650" fill="#e9f0ff">1,000× too small:</text>
+    <text x="1076" y="288" font-size="12" fill="#b9c6e0">a thousands separator</text>
+    <text x="1076" y="305" font-size="12" fill="#b9c6e0">read as a decimal point</text>
+
+    <rect x="1062" y="330" width="190" height="88" rx="14" fill="#1a1d2c" stroke="#ff6b6b" stroke-opacity=".7"/>
+    <circle cx="1082" cy="352" r="9" fill="#ff6b6b"/><text x="1082" y="356" text-anchor="middle" font-size="11" font-weight="800" fill="#0b1422">2</text>
+    <text x="1098" y="356" font-size="10.5" font-weight="800" letter-spacing="1.4" fill="#ff8f8f">VAT TOTAL</text>
+    <text x="1076" y="380" class="mono" font-size="12" fill="#e9f0ff">19% → 1,567.50</text>
+    <text x="1076" y="403" font-size="12" fill="#b9c6e0">digits “67” read as “76”</text>
+
+    <rect x="1062" y="430" width="190" height="88" rx="14" fill="#1a1d2c" stroke="#ff6b6b" stroke-opacity=".7"/>
+    <circle cx="1082" cy="452" r="9" fill="#ff6b6b"/><text x="1082" y="456" text-anchor="middle" font-size="11" font-weight="800" fill="#0b1422">3</text>
+    <text x="1098" y="456" font-size="10.5" font-weight="800" letter-spacing="1.4" fill="#ff8f8f">SELLER IBAN</text>
+    <text x="1076" y="480" font-size="12" fill="#e9f0ff">mod-97 check fails</text>
+    <text x="1076" y="503" font-size="12" fill="#b9c6e0">“O” → “0” makes it valid</text>
+  </g>
+
+  <!-- verdict pill -->
+  <rect x="1062" y="130" width="190" height="48" rx="14" fill="#ff6b6b" fill-opacity=".12" stroke="#ff6b6b" stroke-opacity=".55"/>
+  <text x="1157" y="160" text-anchor="middle" class="serif" font-size="20" font-weight="600" fill="#ff8f8f">Does not add up</text>
+</svg>
