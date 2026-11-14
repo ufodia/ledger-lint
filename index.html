@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ledger Lint — Prove the numbers an AI pulled from an invoice add up</title>
+    <meta
+      name="description"
+      content="Check invoice data extracted by an LLM, Azure Document Intelligence or Google Document AI: line math, VAT, totals, IBAN, EU VAT IDs, Turkish VKN/TCKN and dates — with the likely cause of every mismatch. Runs in your browser."
+    />
+    <meta name="theme-color" content="#0f1a2c" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ledger Lint — Prove the numbers an AI pulled from an invoice add up" />
+    <meta
+      property="og:description"
+      content="Your extraction pipeline read 1.230,00 as 1.23. Ledger Lint re-does the arithmetic, checks every identifier and tells you why a number is wrong."
+    />
+    <meta property="og:image" content="/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Ledger Lint home">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect x="7" y="4" width="26" height="32" rx="4" fill="none" stroke="#8ab4ff" stroke-width="3" />
+          <path
+            d="M12 12h16M12 18h16M12 24h9"
+            stroke="#8ab4ff"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            opacity=".65"
+          />
+          <circle cx="29" cy="29" r="8" fill="#0f1a2c" stroke="#5fd39a" stroke-width="2.6" />
+          <path
+            d="M25.6 29.2l2.4 2.4 4.4-4.8"
+            fill="none"
+            stroke="#5fd39a"
+            stroke-width="2.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span>Ledger Lint</span>
+      </a>
+      <nav class="topnav" aria-label="Primary">
+        <a href="#checks">What it checks</a>
+        <a href="https://github.com/ufodia/ledger-lint" rel="noopener" target="_blank">GitHub</a>
+        <a class="coffee" href="https://buymeacoffee.com/ufodia" rel="noopener" target="_blank">☕ Support</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section id="intro" class="intro">
+        <p class="eyebrow">Invoice arithmetic checks · Runs in your browser</p>
+        <h1>The AI read the invoice. <span>Do the numbers add up?</span></h1>
+        <p class="lead">
+          Paste the JSON that an LLM, Azure Document Intelligence or Google Document AI extracted from an
+          invoice. Ledger Lint re-does the arithmetic, checks VAT rates, IBANs, EU VAT numbers and Turkish
+          VKN/TCKN check digits and the dates — and explains why a number is wrong.
+        </p>
+
+        <div class="input-card">
+          <label class="input-label" for="input"
+            >Extracted invoice JSON <span>— one invoice, an array, or JSON Lines</span></label
+          >
+          <textarea
+            id="input"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder='{ "invoice_number": "…", "line_items": [{ "quantity": 2, "unit_price": 1450, "amount": 2900 }], "subtotal": …, "total": … }'
+          ></textarea>
+          <div class="input-actions">
+            <button id="check" class="button primary" type="button">Check invoice</button>
+            <label class="button ghost file" for="file"
+              >Open a .json file<input id="file" type="file" accept=".json,.jsonl,.txt,application/json"
+            /></label>
+            <label class="option"
+              >Numbers
+              <select id="decimal">
+                <option value="">detect automatically</option>
+                <option value=".">1,234.56</option>
+                <option value=",">1.234,56</option>
+              </select>
+            </label>
+            <label class="option">Reference date <input id="today" type="date" /></label>
+          </div>
+          <p id="input-error" class="error" role="alert" hidden></p>
+          <p class="fine">Nothing is uploaded. The JSON is parsed and checked inside this tab.</p>
+        </div>
+
+        <section class="demos" aria-labelledby="demos-title">
+          <h2 id="demos-title">Or try a demo extraction</h2>
+          <div id="demo-list" class="demo-list"></div>
+        </section>
+
+        <section id="checks" class="checks" aria-labelledby="checks-title">
+          <h2 id="checks-title">What it checks</h2>
+          <div class="check-grid">
+            <article>
+              <span class="icon">∑</span>
+              <h3>Arithmetic</h3>
+              <p>
+                Quantity × unit price, line discounts, subtotal, VAT per rate, total, prepaid amounts, amount
+                due — with rounding told apart from real errors.
+              </p>
+            </article>
+            <article>
+              <span class="icon">%</span>
+              <h3>VAT rules</h3>
+              <p>
+                Rates in force in each EU country, the UK, Switzerland, Norway and Türkiye
+                <em>on the invoice date</em>, KDV tevkifatı, reverse-charge hints.
+              </p>
+            </article>
+            <article>
+              <span class="icon">#</span>
+              <h3>Identifiers</h3>
+              <p>
+                IBAN check digits and lengths for 88 countries, EU VAT number formats and check digits,
+                Turkish VKN and TCKN, e-Fatura ETTN and number year.
+              </p>
+            </article>
+            <article>
+              <span class="icon">◷</span>
+              <h3>Dates</h3>
+              <p>
+                Impossible dates, day/month ambiguity, due dates before the issue date, future invoices,
+                unusual payment terms.
+              </p>
+            </article>
+            <article class="wide">
+              <span class="icon">?</span>
+              <h3>Why it is wrong</h3>
+              <p>
+                Every mismatch gets a likely cause: a thousands separator read as a decimal point, transposed
+                digits, OCR confusions like 8↔3, a dropped digit, gross taken for net, a value copied from
+                another field, an outdated VAT rate.
+              </p>
+            </article>
+            <article class="wide">
+              <span class="icon">{}</span>
+              <h3>Any extraction</h3>
+              <p>
+                LLM JSON with English, German or Turkish field names, Azure “prebuilt-invoice” results, Google
+                Document AI entities, batches and JSON Lines — plus a correction prompt to send back to the
+                model.
+              </p>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section id="workspace" class="workspace" hidden></section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        <a href="https://github.com/ufodia/ledger-lint" rel="noopener" target="_blank">Source on GitHub</a> ·
+        MIT © 2026 ufodia ·
+        <a href="https://buymeacoffee.com/ufodia" rel="noopener" target="_blank">Buy me a coffee</a>
+      </p>
+      <p class="fine">
+        Ledger Lint checks consistency, not truth: it cannot see the original document. VAT rate tables are
+        plausibility checks, not tax advice.
+      </p>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
