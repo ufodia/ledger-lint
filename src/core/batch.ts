@@ -8,6 +8,7 @@ import {
   type Status,
   type Verdict,
 } from './lint.ts';
+import { assertInvoices } from './input.ts';
 
 export interface BatchResult {
   results: LintResult[];
@@ -28,6 +29,7 @@ export function summarize(findings: Finding[]): { counts: Record<Status, number>
 const compact = (s?: string) => (s ?? '').toUpperCase().replace(/[\s.\-/]/g, '');
 
 export function lintBatch(items: unknown[], options: LintOptions = {}): BatchResult {
+  assertInvoices(items);
   const results = items.map((item) => lintInvoice(item, options));
   const seen = new Map<string, number>();
   results.forEach((r, i) => {

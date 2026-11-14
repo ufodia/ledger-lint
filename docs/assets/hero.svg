@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="600" viewBox="0 0 1280 600" role="img" aria-labelledby="t d">
   <title id="t">Ledger Lint</title>
-  <desc id="d">Prove the numbers an AI pulled from an invoice add up. An invoice rebuilt from extracted JSON shows three marked values: line 3 was read as 1.23 instead of 1,230.00, the VAT total has two digits transposed, and the IBAN contains the letter O instead of a zero. Cards on the right explain each cause.</desc>
+  <desc id="d">Check whether extracted invoice numbers add up. A synthetic invoice rebuilt from extracted JSON shows three marked values: line 3 was read as 1.23 instead of 1,230.00, the VAT total has two digits transposed, and the IBAN contains the letter O instead of a zero. Cards on the right explain likely causes.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#14223a"/>
@@ -45,8 +45,8 @@
   </g>
   <text x="70" y="244" class="ui" font-size="14" font-weight="700" letter-spacing="4" fill="#8ab4ff">INVOICE ARITHMETIC CHECKS</text>
   <text x="66" y="318" class="serif" font-size="76" font-weight="600" fill="#e9f0ff">Ledger Lint</text>
-  <text x="70" y="368" class="ui" font-size="26" fill="#cbd7ee">Prove the numbers an AI pulled</text>
-  <text x="70" y="402" class="ui" font-size="26" fill="#cbd7ee">from an invoice add up.</text>
+  <text x="70" y="368" class="ui" font-size="26" fill="#cbd7ee">Valid JSON can still contain</text>
+  <text x="70" y="402" class="ui" font-size="26" fill="#cbd7ee">invalid arithmetic.</text>
   <g class="ui" font-size="14.5" font-weight="650">
     <rect x="70" y="436" width="146" height="34" rx="17" fill="#ff6b6b" fill-opacity=".14" stroke="#ff6b6b" stroke-opacity=".5"/>
     <text x="143" y="458" text-anchor="middle" fill="#ffa3a3">1,000× too small</text>

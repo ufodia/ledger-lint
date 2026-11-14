@@ -5,7 +5,7 @@ import { explain, explainSum } from '../src/core/diagnose.ts';
 import { checkIban, checkTurkishTaxId, checkVatId, tcknValid, vknValid } from '../src/core/ids.ts';
 import { lintInvoice, type LintResult } from '../src/core/lint.ts';
 import { mapInvoice, splitInput } from '../src/core/map.ts';
-import { parseAmount, parseFraction, parseRate, round } from '../src/core/numbers.ts';
+import { parseAmount, parseFraction, parseRate, round, decimalsOf } from '../src/core/numbers.ts';
 import { checkRate } from '../src/core/rates.ts';
 import { correctionPrompt, csvReport, jsonReport, markdownReport } from '../src/core/report.ts';
 import { azureInvoice, batch, euInvoice, trInvoice } from '../src/demo.ts';
@@ -46,12 +46,41 @@ describe('numbers', () => {
     expect(parseFraction('5/10')).toBe(0.5);
     expect(parseFraction(0.2)).toBe(0.2);
     expect(parseFraction('%70')).toBe(0.7);
+    expect(parseFraction('1%')).toBe(0.01);
+    expect(parseFraction('0.5%')).toBe(0.005);
+    expect(parseFraction(1)).toBe(1);
   });
 
   it('rounds half up despite binary floating point', () => {
     expect(round(1.005, 2)).toBe(1.01);
     expect(round(388.626, 2)).toBe(388.63);
     expect(round(-2.675, 2)).toBe(-2.68);
+  });
+
+  it('rejects repeated separators instead of silently dropping digits', () => {
+    for (const value of ['1,234.56.78', '1.234,56,78', '1234,567.89', ',123.45', '1,234.5,6']) {
+      expect(parseAmount(value).error, value).toMatch(/misplaced/);
+      expect(parseAmount(value).value, value).toBeUndefined();
+    }
+    expect(parseAmount('-12-').error).toMatch(/sign/);
+    expect(parseAmount('(-12)').error).toMatch(/not a number/);
+    expect(parseRate('2%0').error).toMatch(/percent/);
+  });
+
+  it('refuses non-finite and unsupported magnitudes', () => {
+    expect(parseAmount('9'.repeat(400)).error).toMatch(/finite/);
+    expect(parseAmount(Infinity).error).toMatch(/finite/);
+    expect(parseAmount(1e20).error).toMatch(/supported numeric range/);
+    expect(parseAmount('1000000000001').error).toMatch(/supported numeric range/);
+    expect(parseFraction(`${'9'.repeat(400)}/10`)).toBeUndefined();
+  });
+
+  it('handles scientific notation when rounding and measuring precision', () => {
+    expect(round(1.23e-7, 8)).toBe(1.2e-7);
+    expect(round(1e-7, 2)).toBe(0);
+    expect(round(-1.25e-7, 8)).toBe(-1.3e-7);
+    expect(decimalsOf(1.23e-7)).toBe(9);
+    expect(Number.isNaN(round(1e21, 2))).toBe(false);
   });
 });
 
@@ -241,6 +270,17 @@ describe('mapping', () => {
     });
   });
 
+  it('retains real provider field paths after unwrapping nested values', () => {
+    const azure = mapInvoice({ analyzeResult: azureInvoice });
+    expect(azure.sources.total).toBe('$.analyzeResult.documents[0].fields.InvoiceTotal.valueCurrency.amount');
+    expect(azure.sources['lines[0].netAmount']).toBe(
+      '$.analyzeResult.documents[0].fields.Items.valueArray[0].valueObject.Amount.valueCurrency.amount',
+    );
+    const google = mapInvoice(batch[7]);
+    expect(google.sources['lines[0].netAmount']).toBe('$.document.entities[7].properties[3].mentionText');
+    expect(google.sources.total).toBe('$.document.entities[11].normalizedValue.moneyValue');
+  });
+
   it('handles flat vendor fields, wrappers, nested totals and unknown fields', () => {
     const m = mapInvoice({
       invoice: {
@@ -267,6 +307,71 @@ describe('mapping', () => {
     expect(splitInput('{"a":1}\n{"a":2}\n').items).toHaveLength(2);
     expect(splitInput('{"a":').error).toMatch(/not valid JSON/);
     expect(splitInput('  ').error).toMatch(/empty/);
+  });
+
+  it('rejects invalid batch members and overflowing JSON numbers', () => {
+    expect(splitInput('[null, 1, []]').error).toMatch(/JSON object/);
+    expect(splitInput('[]').error).toMatch(/No invoices/);
+    expect(splitInput('{"total":1e309}').error).toMatch(/finite numeric range/);
+    expect(splitInput(JSON.stringify(Array.from({ length: 251 }, () => ({})))).error).toMatch(/250/);
+  });
+
+  it('bounds nesting and rejects cycles before recursive provider mapping', () => {
+    let nested: Record<string, unknown> = {};
+    for (let i = 0; i < 45; i++) nested = { invoice: nested };
+    expect(splitInput(JSON.stringify(nested)).error).toMatch(/nesting/);
+    const circular: Record<string, unknown> = {};
+    circular.invoice = circular;
+    expect(() => mapInvoice(circular)).toThrow(/circular/);
+  });
+
+  it('handles malformed provider values with actionable errors', () => {
+    expect(() => mapInvoice({ fields: { Items: { type: 'array', valueArray: {} } } })).toThrow(
+      /Azure valueArray/,
+    );
+    expect(() => mapInvoice({ fields: { Items: { type: 'object', valueObject: null } } })).toThrow(
+      /Azure valueObject/,
+    );
+    expect(() =>
+      mapInvoice({ entities: [{ type: 'line_item', mentionText: '', properties: [null, 3] }] }),
+    ).not.toThrow();
+  });
+
+  it('does not silently discard additional Azure documents', () => {
+    expect(() => mapInvoice({ documents: [{ fields: {} }, { fields: {} }] })).toThrow(/multiple documents/);
+  });
+
+  it('rejects impossible percentages and malformed line or VAT modes', () => {
+    const r = lint({
+      number: 'X',
+      currency: 'EUR',
+      prices_include_vat: 'maybe',
+      items: [null, { quantity: 1, unit_price: 10, amount: 10, vat_rate: -100, vat_amount: 2 }],
+      withholding_rate: '20/10',
+      taxes: [3],
+    });
+    expect(r.mapped.invoice.withholdingRate).toBeUndefined();
+    expect(r.mapped.invoice.lines[0].vatRate).toBeUndefined();
+    expect(r.findings.filter((f) => f.rule === 'reading' && f.status === 'error')).toHaveLength(5);
+    expect(JSON.stringify(r)).not.toMatch(/NaN|Infinity/);
+  });
+
+  it('keeps source and canonical indexes aligned after an invalid line or tax row', () => {
+    const r = lint({
+      number: 'X',
+      currency: 'EUR',
+      items: [null, { quantity: 2, unit_price: 10, amount: 15 }],
+      taxes: [null, { rate: 20, base: 100, amount: 15 }],
+    });
+    expect(r.mapped.invoice.lines).toHaveLength(2);
+    expect(r.mapped.invoice.taxes).toHaveLength(2);
+    expect(r.mapped.sources['lines[1].netAmount']).toBe('$.items[1].amount');
+    expect(r.mapped.sources['taxes[1].amount']).toBe('$.taxes[1].amount');
+    const lineError = r.findings.find((f) => f.rule === 'line-amount' && f.status === 'error');
+    expect(lineError?.fields.every((field) => field.startsWith('lines[1].'))).toBe(true);
+    expect(r.findings.find((f) => f.rule === 'tax-amount')?.fields[0]).toBe('taxes[1].amount');
+    expect(correctionPrompt(r)).toContain('items[1]');
+    expect(correctionPrompt(r)).toContain('taxes[1].amount');
   });
 });
 
@@ -305,6 +410,7 @@ describe('checks on the demos', () => {
     expect(find(r, 'amount-due', 'error')?.cause).toMatch(/withheld VAT was not deducted/);
     expect(find(r, 'withholding')?.status).toBe('pass');
     expect(find(r, 'vat-rate', 'warning')?.message).toMatch(/until 9 Jul 2023/);
+    expect(find(r, 'vat-rate', 'warning')?.fields[0]).toBe('lines[2].vatRate');
     expect(r.findings.find((f) => f.title === 'Seller tax number (VKN)')?.status).toBe('error');
     expect(r.findings.find((f) => f.title === 'Buyer tax number (VKN)')?.status).toBe('pass');
     expect(find(r, 'number-year')?.status).toBe('pass');
@@ -401,6 +507,13 @@ describe('individual checks', () => {
     });
     expect(line?.cause).toMatch(/unit price looks wrong.*8 instead of 5/);
   });
+
+  it('does not present an invoice with no arithmetic coverage as clean', () => {
+    const result = lint({ number: 'X', currency: 'EUR', date: today });
+    expect(result.verdict).toBe('check-warnings');
+    expect(find(result, 'insufficient-arithmetic')?.status).toBe('warning');
+    expect(() => lintInvoice(base, { today: '2026-02-30' })).toThrow(/real calendar date/);
+  });
 });
 
 describe('batch and reports', () => {
@@ -432,15 +545,27 @@ describe('batch and reports', () => {
     );
     expect(csv).not.toMatch(/,pass,/);
     const md = markdownReport(results);
-    expect(md).toContain('| 3 | KC-2026-311 | Kettle & Co GmbH |');
+    expect(md).toContain('| 3 | KC-2026-311 | Kettle &amp; Co GmbH |');
     const prompt = correctionPrompt(lint(euInvoice));
     expect(prompt).toContain('line_items[2].amount (line 3 amount)');
     expect(prompt).toContain('the value should be 1230.00');
-    expect(correctionPrompt(lint(azureInvoice))).toMatch(/No corrections are needed/);
+    expect(correctionPrompt(lint(azureInvoice))).toMatch(/No corrections are suggested/);
   });
 
   it('neutralises spreadsheet formulas in CSV cells', () => {
     const r = lint({ ...euInvoice, invoice_number: '=HYPERLINK("http://x")' });
     expect(csvReport([r])).toContain(`"'=HYPERLINK(""http://x"")"`);
+    r.mapped.invoice.number = '  =1+1';
+    expect(csvReport([r])).toContain("'  =1+1");
+    r.mapped.invoice.number = '\r=1+1';
+    expect(csvReport([r])).toContain("'\r=1+1");
+  });
+
+  it('escapes HTML carried by invoice values in Markdown reports', () => {
+    const r = lint({ ...euInvoice, invoice_number: '<img src=x onerror=alert(1)>' });
+    expect(markdownReport([r])).not.toContain('<img');
+    expect(markdownReport([r])).toContain('&lt;img src=x onerror=alert\\(1\\)&gt;');
+    r.mapped.invoice.number = '![external](https://example.invalid/pixel)';
+    expect(markdownReport([r])).toContain('\\!\\[external\\]\\(https://example.invalid/pixel\\)');
   });
 });

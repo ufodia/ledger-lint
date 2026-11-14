@@ -9,10 +9,12 @@ Paste JSON into the box, click **Open a .json file**, or drop a file anywhere on
 | One invoice | `{ "invoice_number": "…", "line_items": [ … ], "total": … }` |
 | Several invoices | `[ {…}, {…} ]` or `{ "invoices": [ … ] }` |
 | JSON Lines | one invoice object per line |
-| Azure AI Document Intelligence | the full `analyzeResult` (or the object with `documents`) of a `prebuilt-invoice` call |
+| Azure AI Document Intelligence | a single-document `analyzeResult` (or object with `documents`) from a `prebuilt-invoice` call; split multi-document responses into separate fields objects |
 | Google Document AI | the `document` (or the object with `entities`) returned by the invoice parser |
 
 **Numbers** decides how strings like `"1.234"` are read; leave it on *detect automatically* unless the result says a number was ambiguous. **Reference date** is “today” for the future-date check — set it to the date the invoices were received when you re-check old extractions.
+
+Inputs are limited to 20 MiB of UTF-8, 250 invoices, 40 nested levels, 100,000 JSON values and 10,000 entries per container. Absolute numeric values above 1 trillion are unsupported. Larger or deeper input shows an error; split it into smaller supported invoices.
 
 **No extraction at hand?** Open a demo:
 
@@ -26,6 +28,8 @@ Paste JSON into the box, click **Open a .json file**, or drop a file anywhere on
 ## 2. Read the result
 
 The bar at the top gives the verdict — **Does not add up**, **Check the warnings** or **Adds up** — with the number of errors, warnings and passed checks, and how the input was read (format, decimal separator, number of mapped fields).
+
+**Adds up** means the performed checks found no errors or warnings. It does not verify the original document, tax eligibility, registration, bank ownership or payment approval. A warning appears if there is not enough independent data for any arithmetic comparison.
 
 ### The rebuilt invoice
 
@@ -42,7 +46,7 @@ The right side lists findings by family: Arithmetic, Tax, Identifiers, Dates and
 
 **Problems & notes** shows errors, warnings and notes; **All checks** adds every check that passed.
 
-Notes such as *“The subtotal is consistent once line 3 is corrected”* mean the value is fine and the error is reported on the line that caused it.
+Notes such as *“The subtotal is consistent once line 3 is corrected”* mean a proposed line correction explains the subtotal. Confirm that hypothesis against the original document.
 
 ### Batches
 
@@ -66,7 +70,7 @@ Exports always cover every invoice in the input. **Edit the JSON** returns to th
 npm run lint-invoice -- extraction.json --fail-on warning --csv findings.csv --prompt fix.txt
 ```
 
-The Markdown report goes to standard output; exit code `0` means nothing reached `--fail-on` (default `error`), `1` means something did, `2` means a usage or input error. `--today` and `--decimal` match the options in the app.
+The Markdown report goes to standard output; exit code `0` means nothing reached `--fail-on` (default `error`), `1` means something did, `2` means a usage, input or report-write error. `--today` must be a real ISO calendar date; `--decimal` matches the app. Unknown options are rejected. Input and report destinations, or two report destinations, may not overlap, including resolved aliases and existing hard links. Collision checks happen before any report is written.
 
 ## Troubleshooting
 

@@ -1,5 +1,5 @@
 /** Runs every arithmetic, tax, identifier and date check on one extracted invoice. */
-import { daysBetween, formatDate, todayIso } from './dates.ts';
+import { daysBetween, formatDate, parseDate, todayIso } from './dates.ts';
 import { explain, explainSum, type Context } from './diagnose.ts';
 import {
   checkIban,
@@ -56,6 +56,11 @@ const EU = new Set(
 const LABEL = { seller: 'Seller', buyer: 'Buyer' } as const;
 
 export function lintInvoice(input: unknown, options: LintOptions = {}): LintResult {
+  if (
+    options.today &&
+    (!/^\d{4}-\d{2}-\d{2}$/.test(options.today) || parseDate(options.today).iso !== options.today)
+  )
+    throw new Error('The reference date must be a real calendar date in yyyy-mm-dd format.');
   const mapped = mapInvoice(input, options);
   const inv = mapped.invoice;
   const findings: Finding[] = [];
@@ -750,14 +755,19 @@ export function lintInvoice(input: unknown, options: LintOptions = {}): LintResu
   for (const rate of allRates) {
     const check = checkRate(country, rate, inv.issueDate);
     if (!check) continue;
+    const rateFields = [
+      ...inv.lines.flatMap((line, i) => (line.vatRate === rate ? [`lines[${i}].vatRate`] : [])),
+      ...inv.taxes.flatMap((row, i) => (row.rate === rate ? [`taxes[${i}].rate`] : [])),
+      ...(inv.vatRate === rate ? ['vatRate'] : []),
+    ];
     if (check.known)
       add({
         rule: 'vat-rate',
         status: 'pass',
         group: 'tax',
         title: `VAT rate ${formatRate(rate)}`,
-        fields: ['vatRate'],
-        message: `${formatRate(rate)} is a VAT rate in ${country}${inv.issueDate ? ` on ${formatDate(inv.issueDate)}` : ''}.`,
+        fields: rateFields,
+        message: `${formatRate(rate)} appears in the bundled ${country} VAT reference${inv.issueDate ? ` for ${formatDate(inv.issueDate)}` : ''}. This does not establish eligibility.`,
       });
     else
       add({
@@ -765,13 +775,13 @@ export function lintInvoice(input: unknown, options: LintOptions = {}): LintResu
         status: 'warning',
         group: 'tax',
         title: `VAT rate ${formatRate(rate)}`,
-        fields: ['vatRate'],
+        fields: rateFields,
         message: check.outOfPeriod
-          ? `${formatRate(rate)} applied in ${country} ${check.outOfPeriod.to ? `until ${formatDate(check.outOfPeriod.to)}` : `from ${formatDate(check.outOfPeriod.from)}`}; on ${formatDate(inv.issueDate)} the rates are ${check.inForce.map(formatRate).join(', ')}.`
-          : `${formatRate(rate)} is not a VAT rate in ${country} (${check.inForce.map(formatRate).join(', ')}, or 0 %).`,
+          ? `The bundled ${country} reference lists ${formatRate(rate)} ${check.outOfPeriod.to ? `until ${formatDate(check.outOfPeriod.to)}` : `from ${formatDate(check.outOfPeriod.from)}`}; for ${formatDate(inv.issueDate)} it lists ${check.inForce.map(formatRate).join(', ')}.`
+          : `${formatRate(rate)} is not listed in the bundled ${country} VAT reference (${check.inForce.map(formatRate).join(', ')}, or 0 %).`,
         cause: check.outOfPeriod
-          ? 'An outdated rate: the invoice, the date or the rate was misread, or the template is old.'
-          : 'The rate was probably misread, or the seller country is wrong.',
+          ? 'Check the original rate and date, and an official current reference. The invoice, extraction or bundled table may need correction.'
+          : 'Check the original rate and seller country against an official reference; the bundled table may be incomplete.',
       });
   }
   const buyerCountry = inv.buyer.country;
@@ -1027,6 +1037,17 @@ export function lintInvoice(input: unknown, options: LintOptions = {}): LintResu
         });
     }
   }
+
+  if (!findings.some((f) => f.group === 'arithmetic' && f.status !== 'info'))
+    add({
+      rule: 'insufficient-arithmetic',
+      status: 'warning',
+      group: 'document',
+      title: 'Not enough data to verify arithmetic',
+      fields: [],
+      message:
+        'No independent arithmetic comparison could be performed. Include line amounts, quantities and unit prices, or related invoice totals.',
+    });
 
   findings.sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
   const counts = Object.fromEntries(

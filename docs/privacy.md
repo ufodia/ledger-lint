@@ -1,6 +1,6 @@
 # Privacy
 
-Invoices carry names, addresses, tax numbers, bank accounts and prices. Ledger Lint never sends them anywhere.
+Invoices carry names, addresses, tax numbers, bank accounts and prices. Ledger Lint's analysis code processes them locally and has no upload endpoint.
 
 | Behaviour | How it is implemented |
 | --- | --- |
@@ -9,8 +9,10 @@ Invoices carry names, addresses, tax numbers, bank accounts and prices. Ledger L
 | No online lookups | VAT numbers and IBANs are validated offline (formats and check digits). There are no VIES, GİB or bank queries. |
 | No third-party code | `default-src 'self'` and zero runtime dependencies. No analytics, fonts or CDNs. |
 | No storage | Nothing is written to cookies, `localStorage`, `sessionStorage` or IndexedDB. Reloading the tab discards everything. |
-| Nothing executes | Values are inserted as text nodes, never as HTML. CSV exports neutralise cells that a spreadsheet would treat as formulas. |
+| Text rendering and exports | Values are inserted as text nodes, never as HTML. Markdown escapes invoice-supplied HTML. CSV prefixes formula-leading cells, including whitespace-prefixed values; spreadsheet import behaviour remains the responsibility of the application opening the file. |
 | Local exports | Reports are created in the tab and saved through the browser's downloads; the prompt goes to your clipboard only when you click **Copy**. |
+
+The browser still fetches the site's own HTML, JavaScript, CSS and images. `connect-src 'none'` blocks data connections rather than every kind of browser navigation. GitHub and Buy Me a Coffee links open external destinations when selected; invoice values are not added to those links.
 
 ## What remains your responsibility
 

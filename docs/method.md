@@ -1,6 +1,6 @@
 # Method
 
-Ledger Lint answers one question: **are the values extracted from an invoice consistent with each other and with the rules they must follow?** It never sees the original document and never calls a model.
+Ledger Lint asks whether supported extracted values are consistent with each other and with its bundled plausibility rules. It never sees the original document and never calls a model. Findings are review evidence; a clean result does not establish that the source invoice is correct, genuine, legally compliant or payable.
 
 ## 1. Mapping to one invoice
 
@@ -12,13 +12,21 @@ Ledger Lint answers one question: **are the values extracted from an invoice con
 | Google Document AI | `entities` (optionally under `document`) with `type` and `mentionText`; `line_item` and `vat` entities with `properties` become lines and VAT rows; `normalizedValue` money and dates are used when present |
 | Any other JSON | field names are normalised (lower case, accents folded, punctuation removed) and looked up in alias tables for the document, the parties, the lines and the VAT rows — English, German and Turkish names such as `invoice_number`, `Rechnungsnummer`, `fatura_no`, `unit_price`, `birim_fiyat`, `kdv_orani` |
 
-Containers such as `totals`, `summary`, `payment` and a single wrapper like `{ "invoice": { … } }` are flattened. Flat party fields (`vendor_name`, `supplierTaxId`, `alici_vkn`) are split into seller and buyer. Values like `{ "amount": 12, "currency": "EUR" }` are unwrapped. Every canonical field records the JSON path it came from.
+Containers such as `totals`, `summary`, `payment` and a single wrapper like `{ "invoice": { … } }` are flattened. Flat party fields (`vendor_name`, `supplierTaxId`, `alici_vkn`) are split into seller and buyer. Values like `{ "amount": 12, "currency": "EUR" }` are unwrapped. Mapped values retain JSON-style source paths: Azure paths include `valueArray`, `valueObject` and typed value wrappers; Google paths include entity/property indexes and the normalized value or mention used. Composite Google money/date values point to the original composite object. These are descriptive paths rather than a general JSONPath query interface.
+
+A multi-document Azure response is rejected to avoid silently reviewing only its first document. Submit each document's fields object separately.
 
 ### Numbers
 
 `parseAmount` accepts numbers and strings with currency symbols, spaces, apostrophes, parentheses and trailing minus signs. When both `.` and `,` appear, the last one is the decimal separator. A single separator followed by exactly three digits (`1.234`, `1,234`) has two readings: the **document's convention** decides and a warning is recorded. The convention is inferred from the other number strings in the document, then from the seller's country (comma in most of the EU, Norway and Türkiye) and the currency, or set explicitly with the “Numbers” option or `--decimal`.
 
 Rates may be `19`, `"19%"`, `"%20"` (Turkish style), `0.19` or `"0,19"`. Withholding may be `"5/10"`, `0.5` or `50`.
+
+Malformed grouping, repeated decimal separators, non-finite values and absolute numeric inputs above 1 trillion are rejected. VAT percentages outside 0–100 and withholding fractions outside 0–1 are reading errors. An explicit percent sign is respected for small withholding percentages: `"1%"` means `0.01`, while the fraction `1` means full withholding.
+
+The engine uses JavaScript binary64 numbers and decimal half-up rounding, including exponent-form numbers. It is not an arbitrary-precision ledger. Values and intermediate operations can lose precision, and comparisons intentionally allow tolerances; confirm high-value or precision-sensitive results independently.
+
+Browser, CLI and library entry points enforce 250 invoices per batch, 40 nested levels, 100,000 JSON values and 10,000 entries per container. Text/file input is limited to 20 MiB of UTF-8. Cyclic objects and unsupported batch members are rejected before recursive mapping.
 
 ### Dates
 
@@ -45,11 +53,13 @@ When prices include VAT (`prices_include_vat`), line amounts are gross and are c
 
 ### Tax rules
 
-`src/core/rates.ts` lists VAT rates with the dates they apply for the EU-27, the United Kingdom, Switzerland, Norway and Türkiye, compiled in November 2026 from the European Commission's Taxes in Europe Database and national announcements. Among the dated changes: Türkiye 18 % → 20 % and 8 % → 10 % on 10 July 2023; Czechia's 10/15 % → 12 % in 2024; Finland 24 % → 25.5 % (September 2024) and 14 % → 13.5 % (2026); Slovakia 20 % → 23 % (2025); Estonia 22 % → 24 % (July 2025); Romania 19 % → 21 % (August 2025); Lithuania's 9 % rate ending in 2025; Austria's 4.9 % from July 2026.
+`src/core/rates.ts` is a bundled country/rate reference for the EU-27, the United Kingdom, Switzerland, Norway and Türkiye, with selected date windows. It does not model every historical period, territory, product category, exemption or special regime and is not updated online. An open-ended entry is a table convention, not a guarantee that a rate remains current or applied throughout history.
 
-A rate that is not in force for the seller's country on the issue date is a **warning**; a rate that was valid at another time says so. 0 % is always accepted. When the printed VAT total only matches if a line's out-of-date rate is replaced by a current one, that is reported as the cause.
+A rate outside the table's date window or absent from the seller-country reference produces a **warning**. A known older entry can suggest a date or rate extraction issue. Zero is always accepted for plausibility, without establishing an exemption. A matching listed rate is not proof that the invoice uses the correct tax treatment.
 
-A seller and a business buyer in two different EU countries with VAT charged produce an informational reverse-charge hint.
+For current rules, consult the European Commission's [VAT rates guidance](https://taxation-customs.ec.europa.eu/taxation/vat/vat-directive/vat-rates_en) and [Taxes in Europe database](https://ec.europa.eu/taxation_customs/tedb/index.html), or the relevant national authority. The Commission explains that rate categories and special provisions depend on the goods or services and jurisdiction. Rate-table changes in this repository require an official source and effective date.
+
+A seller and a business buyer in two different EU countries with VAT charged produce an informational review hint. The app does not determine transaction type, place of supply, registration or reverse-charge eligibility.
 
 ### Identifiers
 
@@ -61,7 +71,9 @@ A seller and a business buyer in two different EU countries with VAT charged pro
 | TCKN | 11 digits, not starting with 0, two check digits. |
 | ETTN / UUID | 8-4-4-4-12 hexadecimal format. |
 
-Further rules: the VAT number's country should match the party's country; seller and buyer must not share a tax number or IBAN; two different IBANs for the seller are flagged as a common invoice-fraud pattern; an e-Fatura number (`ABC2026000000137`) should carry the year of the issue date.
+Further heuristics flag a VAT-prefix/country mismatch, matching seller/buyer tax numbers or IBANs, different seller/payment IBANs and an e-Fatura number year that differs from the issue date. These can have legitimate explanations and require source review. No finding establishes fraud.
+
+Offline identifier checks do not establish existence, active registration or account ownership. [VIES](https://europa.eu/youreurope/business/finance-and-tax/vat/check-vat-number-vies/index_en.htm) performs a separate VAT-information lookup; Ledger Lint does not call it. National IBAN format references are published in [SWIFT's ISO 13616 registry](https://www.swift.com/standards/data-standards/iban-international-bank-account-number); this app uses its own bundled supported-length table.
 
 ### Dates and document
 
@@ -86,7 +98,9 @@ For a sum, a difference equal to one line means that line is missing or extra. F
 | --- | --- |
 | **Does not add up** | at least one error |
 | **Check the warnings** | warnings, no errors |
-| **Adds up** | only passed checks and notes |
+| **Adds up** | only passed checks and notes; at least one independent arithmetic comparison was possible |
+
+If no independent arithmetic comparison can be performed, a warning explains the missing coverage. Checks requiring absent values are not silently counted as passed. Fix the reference date with the UI or `--today` to reproduce date-sensitive findings.
 
 ## What the method cannot tell you
 

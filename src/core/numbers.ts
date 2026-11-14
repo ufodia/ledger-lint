@@ -31,10 +31,17 @@ export const minorUnits = (currency?: string) => MINOR[(currency ?? '').toUpperC
 /** The smallest amount of a currency, e.g. 0.01 for EUR. */
 export const unitOf = (currency?: string) => 10 ** -minorUnits(currency);
 
-/** Half-up rounding that is not fooled by binary floating point (1.005 → 1.01). */
+/** Half-up decimal rounding, including values rendered in exponent notation. */
 export function round(value: number, decimals = 2): number {
-  const shifted = Number(`${Math.abs(value)}e${decimals}`);
-  return Math.sign(value) * Number(`${Math.round(shifted)}e-${decimals}`);
+  if (!Number.isFinite(value)) return value;
+  const shift = (n: number, places: number) => {
+    const [coefficient, exponent = '0'] = String(n).split('e');
+    return Number(`${coefficient}e${Number(exponent) + places}`);
+  };
+  const shifted = shift(Math.abs(value), decimals);
+  // At this magnitude there is no representable fractional part to round.
+  if (!Number.isFinite(shifted)) return value;
+  return Math.sign(value) * shift(Math.round(shifted), -decimals);
 }
 
 export const near = (a: number, b: number, tolerance: number) => Math.abs(a - b) <= tolerance + 1e-9;
@@ -42,9 +49,8 @@ export const near = (a: number, b: number, tolerance: number) => Math.abs(a - b)
 /** Number of decimals written in a value, e.g. 12.5 → 1, "12,500" with decimal comma → 3. */
 export function decimalsOf(value: number): number {
   if (!Number.isFinite(value) || Number.isInteger(value)) return 0;
-  const text = String(value);
-  if (text.includes('e-')) return Number(text.split('e-')[1]);
-  return text.split('.')[1]?.length ?? 0;
+  const [coefficient, exponent = '0'] = String(value).split('e');
+  return Math.max(0, (coefficient.split('.')[1]?.length ?? 0) - Number(exponent));
 }
 
 export type DecimalHint = '.' | ',' | undefined;
@@ -66,8 +72,7 @@ const STRIP = /[\s  '’]|[€$£₺¥₹]|\b(?:EUR|USD|GBP|TRY|TL|CHF|PLN|SE
  * reading depends on the document's convention; `hint` decides and the result is marked ambiguous.
  */
 export function parseAmount(input: unknown, hint?: DecimalHint): ParsedAmount {
-  if (typeof input === 'number')
-    return Number.isFinite(input) ? { value: input } : { error: 'not a finite number' };
+  if (typeof input === 'number') return checkedNumber(input);
   if (typeof input !== 'string')
     return input === null || input === undefined ? {} : { error: `unexpected ${typeof input}` };
   const raw = input.trim();
@@ -77,12 +82,11 @@ export function parseAmount(input: unknown, hint?: DecimalHint): ParsedAmount {
   if (/^\(.*\)$/.test(text)) {
     sign = -1;
     text = text.slice(1, -1);
-  }
-  if (/^-|-$/.test(text)) {
-    sign = -sign;
+  } else if (/^-|-$/.test(text)) {
+    if (text.startsWith('-') && text.endsWith('-')) return { raw, error: `"${raw}" has more than one sign` };
+    sign = -1;
     text = text.replace(/^-|-$/g, '');
-  }
-  if (text.startsWith('+')) text = text.slice(1);
+  } else if (text.startsWith('+')) text = text.slice(1);
   if (!/^[\d.,]+$/.test(text) || !/\d/.test(text)) return { raw, error: `"${raw}" is not a number` };
 
   const dots = (text.match(/\./g) ?? []).length;
@@ -101,23 +105,39 @@ export function parseAmount(input: unknown, hint?: DecimalHint): ParsedAmount {
 
   const thousands = decimal === '.' ? ',' : decimal === ',' ? '.' : dots ? '.' : ',';
   if (decimal) {
-    const [int, frac = ''] = text.split(decimal);
+    const parts = text.split(decimal);
+    if (parts.length !== 2) return { raw, error: `"${raw}" has misplaced separators` };
+    const [int, frac] = parts;
     const groups = int.split(thousands);
-    if (groups.length > 1 && groups.slice(1).some((g) => g.length !== 3))
+    if (
+      !/^\d*$/.test(frac) ||
+      (groups.length > 1 && (!/^\d{1,3}$/.test(groups[0]) || groups.slice(1).some((g) => !/^\d{3}$/.test(g))))
+    )
       return { raw, error: `"${raw}" has misplaced separators` };
     const value = Number(`${groups.join('')}.${frac}`);
-    return { value: sign * value, raw, ambiguous };
+    return { ...checkedNumber(sign * value), raw, ambiguous };
   }
   const groups = text.split(thousands);
-  if (groups.slice(1).some((g) => g.length !== 3)) return { raw, error: `"${raw}" has misplaced separators` };
-  return { value: sign * Number(groups.join('')), raw, ambiguous };
+  if (groups.length > 1 && (!/^\d{1,3}$/.test(groups[0]) || groups.slice(1).some((g) => !/^\d{3}$/.test(g))))
+    return { raw, error: `"${raw}" has misplaced separators` };
+  return { ...checkedNumber(sign * Number(groups.join(''))), raw, ambiguous };
 }
+
+/** Stay below the point where binary64 can lose whole currency minor units. */
+const checkedNumber = (value: number): ParsedAmount =>
+  !Number.isFinite(value)
+    ? { error: 'not a finite number' }
+    : Math.abs(value) > 1_000_000_000_000
+      ? { error: 'outside the supported numeric range (absolute value must not exceed 1 trillion)' }
+      : { value };
 
 /** VAT rates as percentages: 20, "20%", "%20", 0.2 and "0,20" all give 20. */
 export function parseRate(input: unknown, hint?: DecimalHint): ParsedAmount {
   if (typeof input === 'string') {
     const t = input.trim();
     const percent = /%/.test(t);
+    if (percent && !/^(?:%\s*[^%]+|[^%]+\s*%)$/.test(t))
+      return { raw: t, error: `"${t}" has a misplaced percent sign` };
     const parsed = parseAmount(
       t.replace(/%/g, ''),
       hint ?? (t.includes(',') && !t.includes('.') ? ',' : undefined),
@@ -137,10 +157,15 @@ export function parseRate(input: unknown, hint?: DecimalHint): ParsedAmount {
 export function parseFraction(input: unknown): number | undefined {
   if (typeof input === 'string') {
     const m = /^\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(input);
-    if (m) return Number(m[2]) ? Number(m[1]) / Number(m[2]) : undefined;
+    if (m) {
+      const numerator = parseAmount(m[1]).value;
+      const denominator = parseAmount(m[2]).value;
+      return numerator !== undefined && denominator ? numerator / denominator : undefined;
+    }
   }
   const rate = parseRate(input).value;
   if (rate === undefined) return undefined;
+  if (typeof input === 'string' && input.includes('%')) return rate / 100;
   return rate > 1 ? rate / 100 : rate;
 }
 

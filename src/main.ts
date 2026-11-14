@@ -11,6 +11,7 @@ import {
   type Verdict,
 } from './core/lint.ts';
 import { splitInput } from './core/map.ts';
+import { MAX_INPUT_BYTES } from './core/input.ts';
 import { formatAmount, formatRate } from './core/numbers.ts';
 import { correctionPrompt, csvReport, jsonReport, markdownReport } from './core/report.ts';
 import { DEMOS } from './demo.ts';
@@ -19,13 +20,16 @@ import { byId, download, h } from './dom.ts';
 const VERDICT: Record<Verdict, { title: string; text: string }> = {
   'does-not-add-up': {
     title: 'Does not add up',
-    text: 'At least one value contradicts the others. Check the marked fields against the original document.',
+    text: 'One or more supplied values failed a check. Review the marked fields against the original document.',
   },
   'check-warnings': {
     title: 'Check the warnings',
-    text: 'Nothing is arithmetically broken, but some values look suspicious.',
+    text: 'No arithmetic contradiction was found in the checks performed. Review the warnings.',
   },
-  'adds-up': { title: 'Adds up', text: 'Every arithmetic, tax, identifier and date check passed.' },
+  'adds-up': {
+    title: 'Adds up',
+    text: 'No errors or warnings in the checks performed. Confirm against the original invoice.',
+  },
 };
 const GROUPS: [Group, string][] = [
   ['arithmetic', 'Arithmetic'],
@@ -47,6 +51,7 @@ let results: LintResult[] = [];
 let current = 0;
 let selected: string | null = null;
 let showAll = false;
+let inputVersion = 0;
 
 const intro = byId('intro');
 const workspace = byId('workspace');
@@ -57,21 +62,28 @@ const today = byId<HTMLInputElement>('today');
 today.value = new Date().toISOString().slice(0, 10);
 
 function fail(message: string) {
+  intro.hidden = false;
+  workspace.hidden = true;
   inputError.textContent = message;
   inputError.hidden = false;
 }
 
 function run(text: string) {
+  inputVersion++;
   inputError.hidden = true;
   const { items, error } = splitInput(text);
   if (error) return fail(error);
   if (!items.length) return fail('No invoices were found in the input.');
   if (items.some((x) => typeof x !== 'object' || x === null || Array.isArray(x)))
     return fail('Each invoice must be a JSON object.');
-  results = lintBatch(items, {
-    today: today.value || undefined,
-    decimal: (decimal.value || undefined) as ',' | '.' | undefined,
-  }).results;
+  try {
+    results = lintBatch(items, {
+      today: today.value || undefined,
+      decimal: (decimal.value || undefined) as ',' | '.' | undefined,
+    }).results;
+  } catch (error) {
+    return fail(`Cannot check this input: ${(error as Error).message}`);
+  }
   current = 0;
   showAll = false;
   selectFirst();
@@ -93,21 +105,31 @@ input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) run(input.value);
 });
 const fileInput = byId<HTMLInputElement>('file');
+input.addEventListener('input', () => inputVersion++);
+async function openFile(file: File) {
+  const version = ++inputVersion;
+  if (file.size > MAX_INPUT_BYTES) return fail('The file is larger than 20 MB.');
+  try {
+    const text = await file.text();
+    if (version !== inputVersion) return;
+    input.value = text;
+    run(text);
+  } catch {
+    if (version === inputVersion) fail('The file could not be read. Try opening it again.');
+  }
+}
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files?.[0];
   fileInput.value = '';
   if (!file) return;
-  if (file.size > 20 * 1024 * 1024) return fail('The file is larger than 20 MB.');
-  input.value = await file.text();
-  run(input.value);
+  await openFile(file);
 });
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {
   e.preventDefault();
   const file = e.dataTransfer?.files[0];
   if (!file) return;
-  input.value = await file.text();
-  run(input.value);
+  await openFile(file);
 });
 
 const demoList = byId('demo-list');
@@ -265,6 +287,7 @@ function verdictBar(r: LintResult): HTMLElement {
           class: 'button ghost small',
           type: 'button',
           onclick: () => {
+            inputVersion++;
             workspace.hidden = true;
             intro.hidden = false;
             input.focus();
@@ -278,6 +301,7 @@ function verdictBar(r: LintResult): HTMLElement {
           class: 'button ghost small',
           type: 'button',
           onclick: () => {
+            inputVersion++;
             input.value = '';
             workspace.hidden = true;
             workspace.replaceChildren();
@@ -565,7 +589,7 @@ function panel(r: LintResult): HTMLElement {
       : h(
           'p',
           { class: 'all-clear' },
-          '✓ No problems found. Switch to “All checks” to see what was verified.',
+          '✓ No errors or warnings found. Switch to “All checks” to see which checks ran.',
         ),
     h(
       'section',

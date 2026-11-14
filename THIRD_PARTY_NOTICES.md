@@ -12,8 +12,8 @@ Vite, TypeScript, Vitest, Playwright, tsx and Prettier build, run and test the p
 
 ## Reference data
 
-- IBAN lengths follow the SWIFT IBAN Registry.
-- VAT rates were compiled in November 2026 from the European Commission's Taxes in Europe Database and national announcements; Türkiye's rates follow Presidential Decree 7346 (July 2023). They are facts, not copyrighted material, and are provided without warranty.
+- Supported IBAN lengths are bundled format reference data; the authoritative registry is published by [SWIFT](https://www.swift.com/standards/data-standards/iban-international-bank-account-number).
+- VAT rates are a bundled plausibility reference with selected date windows. They are not a live or complete tax service. Consult [official EU guidance](https://taxation-customs.ec.europa.eu/taxation/vat/vat-directive/vat-rates_en) and the relevant national authority. See [the method](docs/method.md) for coverage and limits.
 - Check-digit algorithms are public; test vectors are published examples.
 
 ## Demo data

@@ -6,11 +6,12 @@ Ledger Lint is a static Vite app plus a small Node command line. Both use the sa
 src/
 ├── core/
 │   ├── numbers.ts    amount, rate and fraction parsing; half-up rounding; currency minor units
+│   ├── input.ts      shared JSON, nesting, batch and resource limits
 │   ├── dates.ts      date parsing in many conventions; ambiguity and validity
 │   ├── ids.ts        IBAN, EU VAT numbers, VKN, TCKN, UUID, e-Fatura numbers
 │   ├── rates.ts      VAT rates by country with validity dates
 │   ├── model.ts      the canonical Invoice, Party, Line and TaxRow types
-│   ├── map.ts        any JSON → Invoice (+ source paths, raw strings, notes, unused fields)
+│   ├── map.ts        supported JSON → Invoice (+ source paths, raw strings, notes, unused fields)
 │   ├── diagnose.ts   error signatures for mismatching numbers and sums
 │   ├── lint.ts       every check → findings, counts, verdict
 │   ├── batch.ts      many invoices; duplicate detection
@@ -65,13 +66,19 @@ interface Finding {
 
 `LintResult` holds the `Mapped` input, the findings sorted by status, the counts per status and the verdict.
 
+Entry points reject unsupported structures before recursive mapping. Library callers should catch validation errors. Provider normalization preserves Azure typed-value wrapper paths and Google entity/property indexes rather than inventing normalized field locations. Google money/date sources point to their composite input object. See [method](method.md) for limits and precision boundaries.
+
 ## The browser app
 
 `main.ts` keeps the results, the selected invoice, the selected finding and the “all checks” toggle in module variables and re-renders the workspace with `h()`. Every value from the input becomes a text node, so markup in an invoice is displayed, never interpreted. Field cells carry `data-field` with their canonical path; findings and cells are linked through those paths.
 
+File-picker and drag/drop imports use the same size guard. A version token discards a completed asynchronous file read if the user has edited the input or started another check in the meantime. Read/validation errors remain visible and recoverable in the input form.
+
 ## The command line
 
 `cli.ts` runs under `tsx`: it reads the files, splits each into invoices, runs `lintBatch`, writes the requested reports and the correction prompt, prints Markdown and sets the exit code.
+
+Report paths are compared with input and other report paths before writes using lexical/real paths and existing file identities, preventing accidental input overwrite through common aliases or hard links. This is a local-tool guard, not protection against an adversary changing filesystem links during a run.
 
 ## Library use
 
@@ -87,4 +94,5 @@ const result = lintInvoice(extractedJson, { today: '2026-11-14', decimal: ',' })
 
 - `tests/core.test.ts` — parsing, identifiers against published examples, rate validity, diagnosis signatures, all input formats, every planted demo error, individual checks (rounding tier, prices including VAT, dates, same party, changed IBAN, duplicates, precision, misread unit price), batches and reports.
 - `tests/hosting.test.mjs` — the production hosting script.
+- `tests/cli.test.ts` — unknown options, date validation, exit codes and report/input collision protection.
 - `e2e/app.spec.ts` — the real app in Chromium: demos, field/finding linking, Turkish formatting, the clean Azure result, batch navigation, input errors, JSON Lines and files, the clipboard prompt and exports, no off-origin requests and the phone layout.

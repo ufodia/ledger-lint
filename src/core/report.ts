@@ -5,9 +5,9 @@ import { formatAmount } from './numbers.ts';
 export const TOOL = { name: 'Ledger Lint', version: '1.0.0', url: 'https://github.com/ufodia/ledger-lint' };
 
 export const VERDICT_TEXT: Record<Verdict, string> = {
-  'adds-up': 'Adds up — every check passed',
-  'check-warnings': 'Check the warnings — nothing is broken, but some values look suspicious',
-  'does-not-add-up': 'Does not add up — at least one value contradicts the others',
+  'adds-up': 'Adds up — no errors or warnings in the checks performed',
+  'check-warnings': 'Check the warnings — no arithmetic contradiction found in the checks performed',
+  'does-not-add-up': 'Does not add up — one or more supplied values failed a check',
 };
 
 const source = (r: LintResult, f: Finding) => (f.fields[0] ? r.mapped.sources[f.fields[0]] : undefined);
@@ -48,10 +48,10 @@ export function jsonReport(results: LintResult[], now = new Date()): string {
   );
 }
 
-/** Values starting with = + - @ (or tab / carriage return) get a leading ' so spreadsheet apps show them as text. */
+/** Neutralise formula-leading values, including whitespace/control-prefixed cells. */
 const csvCell = (v: string) => {
-  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
-  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  const safe = /^[\s\u0000-\u001f]*[=+\-@]|^[\t\r\n]/.test(v) ? `'${v}` : v;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
 export function csvReport(results: LintResult[], includePassed = false): string {
@@ -95,7 +95,15 @@ export function csvReport(results: LintResult[], includePassed = false): string 
 }
 
 export function markdownReport(results: LintResult[], now = new Date()): string {
-  const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const esc = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\\/g, '\\\\')
+      .replace(/[\[\]`*_{}()!#]/g, '\\$&')
+      .replace(/\|/g, '\\|')
+      .replace(/[\r\n]/g, ' ');
   const lines = [
     '# Ledger Lint report',
     '',
@@ -110,7 +118,7 @@ export function markdownReport(results: LintResult[], now = new Date()): string 
     results.forEach((r, i) => {
       const inv = r.mapped.invoice;
       lines.push(
-        `| ${i + 1} | ${esc(label(r, i))} | ${esc(inv.seller.name ?? '—')} | ${inv.total !== undefined ? `${formatAmount(inv.total, inv.currency)} ${inv.currency ?? ''}`.trim() : '—'} | ${r.counts.error} | ${r.counts.warning} | ${r.verdict} |`,
+        `| ${i + 1} | ${esc(label(r, i))} | ${esc(inv.seller.name ?? '—')} | ${inv.total !== undefined ? esc(`${formatAmount(inv.total, inv.currency)} ${inv.currency ?? ''}`.trim()) : '—'} | ${r.counts.error} | ${r.counts.warning} | ${r.verdict} |`,
       );
     });
     lines.push('');
@@ -155,7 +163,7 @@ export function correctionPrompt(result: LintResult): string {
     (f) => (f.status === 'error' || f.status === 'warning') && f.fields.length && f.rule !== 'unused-fields',
   );
   if (!issues.length)
-    return 'All arithmetic, tax, identifier and date checks passed. No corrections are needed.';
+    return 'No corrections are suggested by the checks performed. Confirm the extracted values against the original document.';
   const out = [
     'Some values in the invoice data you extracted are inconsistent with each other. Look at the original document again and check these fields:',
     '',

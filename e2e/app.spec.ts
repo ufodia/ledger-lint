@@ -152,3 +152,62 @@ test('phone layout has no horizontal scroll', async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(page.locator('.paper')).toBeVisible();
 });
+
+test('malformed provider data and deep JSON show errors and allow recovery', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await page.locator('#input').fill('{"fields":{"Items":{"type":"array","valueArray":{}}}}');
+  await page.getByRole('button', { name: 'Check invoice' }).click();
+  await expect(page.locator('#input-error')).toContainText('Azure valueArray must be an array');
+  await page.locator('#input').fill('{"invoice":'.repeat(45) + '{}' + '}'.repeat(45));
+  await page.getByRole('button', { name: 'Check invoice' }).click();
+  await expect(page.locator('#input-error')).toContainText('nesting exceeds');
+  await page.locator('.demo', { hasText: 'German agency invoice' }).click();
+  await expect(page.locator('.verdict-bar h1')).toHaveText('Does not add up');
+  await page.locator('#file').setInputFiles({
+    name: 'malformed.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"fields":{"Items":{"type":"array","valueArray":{}}}}'),
+  });
+  await expect(page.locator('#input-error')).toBeVisible();
+  await expect(page.locator('#input-error')).toContainText('Azure valueArray');
+  expect(errors).toEqual([]);
+});
+
+test('invoice content is rendered as text and missing arithmetic remains a warning', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#input').fill(
+    JSON.stringify({
+      number: '<img src=x onerror="document.body.dataset.injected=1">',
+      currency: 'EUR',
+      date: '2026-11-14',
+    }),
+  );
+  await page.getByRole('button', { name: 'Check invoice' }).click();
+  await expect(page.locator('.verdict-bar h1')).toHaveText('Check the warnings');
+  await expect(page.locator('.finding', { hasText: 'Not enough data to verify arithmetic' })).toBeVisible();
+  await expect(page.locator('.paper img')).toHaveCount(0);
+  await expect(page.locator('body')).not.toHaveAttribute('data-injected', '1');
+});
+
+test('starting a new check discards a pending file read', async ({ page }) => {
+  await demo(page, 'German agency invoice');
+  await page.evaluate(() => {
+    File.prototype.text = () =>
+      new Promise<string>((resolve) => {
+        Object.assign(window, {
+          finishDelayedRead: () => resolve('{"number":"LATE","currency":"EUR","total":1}'),
+        });
+      });
+  });
+  await page
+    .locator('#file')
+    .setInputFiles({ name: 'late.json', mimeType: 'application/json', buffer: Buffer.from('{}') });
+  await page.waitForFunction(() => 'finishDelayedRead' in window);
+  await page.getByRole('button', { name: 'New check', exact: true }).click();
+  await page.evaluate(() => (window as unknown as { finishDelayedRead: () => void }).finishDelayedRead());
+  await expect(page.locator('#intro')).toBeVisible();
+  await expect(page.locator('#input')).toHaveValue('');
+  await expect(page.locator('#workspace')).toBeHidden();
+});

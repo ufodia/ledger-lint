@@ -4,6 +4,7 @@
  * and Google Document AI invoice entities.
  */
 import { parseDate } from './dates.ts';
+import { assertInvoices, assertJsonTree, MAX_INPUT_BYTES } from './input.ts';
 import type { Invoice, Line, Mapped, Note, Party, TaxRow } from './model.ts';
 import { parseAmount, parseFraction, parseRate, type DecimalHint } from './numbers.ts';
 
@@ -234,14 +235,29 @@ export function countryCode(input: unknown): string | undefined {
 // ——— Provider formats ———
 
 /** Azure AI Document Intelligence: { type, valueString | valueNumber | valueCurrency | valueArray | valueObject, content }. */
-function unwrapAzure(v: Json): Json {
-  if (Array.isArray(v)) return v.map(unwrapAzure);
-  if (!isObj(v)) return v;
-  if ('valueArray' in v) return (v.valueArray as Json[]).map(unwrapAzure);
-  if ('valueObject' in v) return unwrapAzure(v.valueObject as Json);
+function unwrapAzure(v: Json, origins: Record<string, string>, path: string, original = path): Json {
+  const remember = (value: Json, source = original) => {
+    origins[path] = source;
+    return value;
+  };
+  if (Array.isArray(v)) return v.map((x, i) => unwrapAzure(x, origins, `${path}[${i}]`, `${original}[${i}]`));
+  if (!isObj(v)) return remember(v);
+  if ('valueArray' in v) {
+    if (!Array.isArray(v.valueArray)) throw new Error('Azure valueArray must be an array.');
+    return unwrapAzure(v.valueArray, origins, path, `${original}.valueArray`);
+  }
+  if ('valueObject' in v) {
+    if (!isObj(v.valueObject)) throw new Error('Azure valueObject must be an object.');
+    return unwrapAzure(v.valueObject, origins, path, `${original}.valueObject`);
+  }
   if ('valueCurrency' in v && isObj(v.valueCurrency)) {
     const c = v.valueCurrency;
-    return c.currencyCode ? { amount: c.amount, currency: c.currencyCode } : (c.amount ?? null);
+    if (c.currencyCode) {
+      origins[`${path}.amount`] = `${original}.valueCurrency.amount`;
+      origins[`${path}.currency`] = `${original}.valueCurrency.currencyCode`;
+      return { amount: c.amount, currency: c.currencyCode };
+    }
+    return remember(c.amount ?? null, `${original}.valueCurrency.amount`);
   }
   for (const k of [
     'valueNumber',
@@ -252,16 +268,18 @@ function unwrapAzure(v: Json): Json {
     'valuePhoneNumber',
     'valueBoolean',
   ])
-    if (k in v) return v[k] as Json;
-  if ('valueAddress' in v || ('content' in v && 'type' in v)) return (v.content as Json) ?? null;
-  const out: Obj = {};
-  for (const [k, x] of Object.entries(v)) if (!IGNORED.has(keyOf(k))) out[k] = unwrapAzure(x);
+    if (k in v) return remember(v[k] as Json, `${original}.${k}`);
+  if ('valueAddress' in v || ('content' in v && 'type' in v))
+    return remember((v.content as Json) ?? null, `${original}.content`);
+  const out: Obj = Object.create(null) as Obj;
+  for (const [k, x] of Object.entries(v))
+    if (!IGNORED.has(keyOf(k))) out[k] = unwrapAzure(x, origins, `${path}.${k}`, `${original}.${k}`);
   return out;
 }
 
 /** Google Document AI: entities [{ type, mentionText, normalizedValue, properties }]. */
-function fromGoogle(entities: Json[]): Obj {
-  const out: Obj = {};
+function fromGoogle(entities: Json[], origins: Record<string, string>, prefix: string): Obj {
+  const out: Obj = Object.create(null) as Obj;
   const lines: Obj[] = [];
   const taxes: Obj[] = [];
   const value = (e: Obj): Json => {
@@ -280,47 +298,94 @@ function fromGoogle(entities: Json[]): Obj {
     }
     return (e.mentionText as Json) ?? null;
   };
-  for (const e of entities) {
+  const source = (e: Obj, path: string) => {
+    const n = e.normalizedValue;
+    if (isObj(n)) {
+      if (isObj(n.moneyValue)) return `${path}.normalizedValue.moneyValue`;
+      if (isObj(n.dateValue)) return `${path}.normalizedValue.dateValue`;
+      if (typeof n.text === 'string') return `${path}.normalizedValue.text`;
+    }
+    return `${path}.mentionText`;
+  };
+  for (const [i, e] of entities.entries()) {
     if (!isObj(e) || typeof e.type !== 'string') continue;
     const props = Array.isArray(e.properties) ? (e.properties as Obj[]) : [];
-    const sub = () => {
-      const o: Obj = {};
-      for (const p of props) if (typeof p.type === 'string') o[p.type.split('/').pop()!] = value(p);
+    const sub = (target: string) => {
+      const o: Obj = Object.create(null) as Obj;
+      for (const [j, p] of props.entries())
+        if (isObj(p) && typeof p.type === 'string') {
+          const name = p.type.split('/').pop()!;
+          o[name] = value(p);
+          origins[`${prefix}.${target}.${name}`] = source(p, `${prefix}[${i}].properties[${j}]`);
+        }
       return o;
     };
-    if (e.type === 'line_item') lines.push(props.length ? sub() : { description: value(e) });
-    else if (e.type === 'vat' && props.length) taxes.push(sub());
-    else if (!(e.type in out)) out[e.type] = value(e);
+    if (e.type === 'line_item') {
+      if (props.length) lines.push(sub(`line_items[${lines.length}]`));
+      else {
+        origins[`${prefix}.line_items[${lines.length}].description`] = source(e, `${prefix}[${i}]`);
+        lines.push({ description: value(e) });
+      }
+    } else if (e.type === 'vat' && props.length) taxes.push(sub(`tax_breakdown[${taxes.length}]`));
+    else if (!(e.type in out)) {
+      out[e.type] = value(e);
+      origins[`${prefix}.${e.type}`] = source(e, `${prefix}[${i}]`);
+    }
   }
   if (lines.length) out.line_items = lines;
   if (taxes.length) out.tax_breakdown = taxes;
   return out;
 }
 
-function detectFormat(input: Json): { body: Obj; format: Mapped['format']; prefix: string } {
+function detectFormat(input: Json): {
+  body: Obj;
+  format: Mapped['format'];
+  prefix: string;
+  origins: Record<string, string>;
+} {
+  const origins: Record<string, string> = {};
   if (isObj(input)) {
     const result = isObj(input.analyzeResult) ? input.analyzeResult : input;
-    if (Array.isArray(result.documents) && isObj(result.documents[0]) && isObj(result.documents[0].fields))
+    if (
+      Array.isArray(result.documents) &&
+      result.documents.length > 1 &&
+      isObj(result.documents[0]) &&
+      isObj(result.documents[0].fields)
+    )
+      throw new Error(
+        'This Azure response has multiple documents. Submit each document fields object as a separate invoice.',
+      );
+    if (Array.isArray(result.documents) && isObj(result.documents[0]) && isObj(result.documents[0].fields)) {
+      const prefix = `${isObj(input.analyzeResult) ? '$.analyzeResult' : '$'}.documents[0].fields`;
       return {
-        body: unwrapAzure(result.documents[0].fields) as Obj,
+        body: unwrapAzure(result.documents[0].fields, origins, prefix) as Obj,
         format: 'azure',
-        prefix: '$.documents[0].fields',
+        prefix,
+        origins,
       };
+    }
     if (isObj(input.fields) && Object.values(input.fields).some((f) => isObj(f) && 'type' in f))
-      return { body: unwrapAzure(input.fields) as Obj, format: 'azure', prefix: '$.fields' };
+      return {
+        body: unwrapAzure(input.fields, origins, '$.fields') as Obj,
+        format: 'azure',
+        prefix: '$.fields',
+        origins,
+      };
     const doc = isObj(input.document) ? input.document : input;
     if (
       Array.isArray(doc.entities) &&
       doc.entities.some((e) => isObj(e) && typeof e.type === 'string' && 'mentionText' in e)
-    )
-      return { body: fromGoogle(doc.entities), format: 'google', prefix: '$.entities' };
+    ) {
+      const prefix = `${isObj(input.document) ? '$.document' : '$'}.entities`;
+      return { body: fromGoogle(doc.entities, origins, prefix), format: 'google', prefix, origins };
+    }
     // { "invoice": { … } } and similar single wrappers.
     const keys = Object.keys(input);
     if (keys.length === 1 && isObj(input[keys[0]]) && CONTAINERS.has(keyOf(keys[0])))
-      return { body: input[keys[0]] as Obj, format: 'generic', prefix: `$.${keys[0]}` };
-    return { body: input, format: 'generic', prefix: '$' };
+      return { body: input[keys[0]] as Obj, format: 'generic', prefix: `$.${keys[0]}`, origins };
+    return { body: input, format: 'generic', prefix: '$', origins };
   }
-  return { body: {}, format: 'generic', prefix: '$' };
+  return { body: {}, format: 'generic', prefix: '$', origins };
 }
 
 /** Guesses the decimal separator from the strings in the document, then from the country. */
@@ -346,7 +411,9 @@ function inferDecimal(body: Json, country?: string, currency?: string): '.' | ',
 // ——— Mapping ———
 
 export function mapInvoice(input: unknown, options: MapOptions = {}): Mapped {
-  const { body, format, prefix } = detectFormat(input as Json);
+  if (!isObj(input)) throw new Error('Each invoice must be a JSON object.');
+  assertJsonTree(input);
+  const { body, format, prefix, origins } = detectFormat(input as Json);
   const invoice: Invoice = { seller: {}, buyer: {}, lines: [], taxes: [] };
   const sources: Record<string, string> = {};
   const raw: Record<string, string> = {};
@@ -448,6 +515,10 @@ export function mapInvoice(input: unknown, options: MapOptions = {}): Mapped {
         level: 'warning',
         message: `${parsed.ambiguous}; read as ${parsed.value} (decimal separator "${decimal}").`,
       });
+    if (kind === 'rate' && parsed.value !== undefined && (parsed.value < 0 || parsed.value > 100)) {
+      notes.push({ field: canonical, level: 'error', message: 'VAT percentages must be between 0 and 100.' });
+      return;
+    }
     if (parsed.value !== undefined) target[field] = parsed.value;
   };
   const setDate = (
@@ -526,18 +597,26 @@ export function mapInvoice(input: unknown, options: MapOptions = {}): Mapped {
         const f = parseFraction(s.value);
         markUsed(s.path);
         sources.withholdingRate = s.path;
-        if (f !== undefined) invoice.withholdingRate = f;
+        if (f !== undefined && f >= 0 && f <= 1) invoice.withholdingRate = f;
         else
           notes.push({
             field: 'withholdingRate',
             level: 'error',
-            message: `"${String(s.value)}" is not a withholding rate such as 5/10.`,
+            message: `"${String(s.value)}" is not a withholding rate between 0 and 1, such as 5/10.`,
           });
         break;
       }
       case 'pricesIncludeVat':
         markUsed(s.path);
-        invoice.pricesIncludeVat = s.value === true || /^(true|yes|evet|ja|1)$/i.test(String(s.value));
+        sources.pricesIncludeVat = s.path;
+        if (/^(true|yes|evet|ja|1)$/i.test(String(s.value))) invoice.pricesIncludeVat = true;
+        else if (/^(false|no|hayir|hayır|nein|0)$/i.test(String(s.value))) invoice.pricesIncludeVat = false;
+        else
+          notes.push({
+            field: 'pricesIncludeVat',
+            level: 'error',
+            message: 'Prices include VAT must be true or false.',
+          });
         break;
       case 'iban':
         if (text(s.value)) {
@@ -617,7 +696,15 @@ export function mapInvoice(input: unknown, options: MapOptions = {}): Mapped {
     (linesArr.value as Json[]).forEach((item, i) => {
       const line: Line = {};
       const base = `${linesArr!.path}[${i}]`;
-      if (!isObj(item)) return;
+      if (!isObj(item)) {
+        invoice.lines.push({});
+        notes.push({
+          field: `lines[${i}]`,
+          level: 'error',
+          message: 'Each line item must be a JSON object.',
+        });
+        return;
+      }
       for (const [k, v] of Object.entries(item)) {
         const key = keyOf(k);
         const path = `${base}.${k}`;
@@ -654,7 +741,11 @@ export function mapInvoice(input: unknown, options: MapOptions = {}): Mapped {
   // Tax breakdown.
   if (taxesArr) {
     (taxesArr.value as Json[]).forEach((item, i) => {
-      if (!isObj(item)) return;
+      if (!isObj(item)) {
+        invoice.taxes.push({});
+        notes.push({ field: `taxes[${i}]`, level: 'error', message: 'Each tax row must be a JSON object.' });
+        return;
+      }
       const row: TaxRow = {};
       for (const [k, v] of Object.entries(item)) {
         const field = TAX_ROW.get(keyOf(k));
@@ -688,7 +779,8 @@ export function mapInvoice(input: unknown, options: MapOptions = {}): Mapped {
   const unused = all.filter(
     (p) => ![...used].some((u) => p === u || p.startsWith(`${u}.`) || p.startsWith(`${u}[`)),
   );
-  return { invoice, sources, raw, notes, unused, format, decimal };
+  for (const field of Object.keys(sources)) sources[field] = origins[sources[field]] ?? sources[field];
+  return { invoice, sources, raw, notes, unused: unused.map((p) => origins[p] ?? p), format, decimal };
 }
 
 function looksLikeRate(v: Json, hint: DecimalHint): boolean {
@@ -723,11 +815,21 @@ function normalizeCurrency(value: Json | undefined, notes: Note[]): string | und
 
 /** Splits input text into one or more invoice objects: a JSON object, a JSON array, { invoices: [...] } or JSON Lines. */
 export function splitInput(textInput: string): { items: unknown[]; error?: string } {
+  if (new TextEncoder().encode(textInput).byteLength > MAX_INPUT_BYTES)
+    return { items: [], error: 'Input is larger than 20 MB. Split the file or batch.' };
   const t = textInput.trim();
   if (!t) return { items: [], error: 'The input is empty.' };
+  const checked = (items: unknown[]) => {
+    try {
+      assertInvoices(items);
+      return { items };
+    } catch (error) {
+      return { items: [], error: (error as Error).message };
+    }
+  };
   try {
     const parsed = JSON.parse(t) as Json;
-    if (Array.isArray(parsed)) return { items: parsed };
+    if (Array.isArray(parsed)) return checked(parsed);
     if (isObj(parsed)) {
       const key = Object.keys(parsed).find((k) =>
         ['invoices', 'documents', 'results', 'data'].includes(keyOf(k)),
@@ -741,15 +843,15 @@ export function splitInput(textInput: string): { items: unknown[]; error?: strin
           'fields' in ((parsed[key] as Json[])[0] as Obj)
         )
       )
-        return { items: parsed[key] as Json[] };
-      return { items: [parsed] };
+        return checked(parsed[key] as Json[]);
+      return checked([parsed]);
     }
     return { items: [], error: 'The JSON must be an object or an array of objects.' };
   } catch (error) {
     const lines = t.split(/\r?\n/).filter((l) => l.trim());
     if (lines.length > 1) {
       try {
-        return { items: lines.map((l) => JSON.parse(l)) };
+        return checked(lines.map((l) => JSON.parse(l)));
       } catch {
         /* fall through */
       }
