@@ -5,6 +5,7 @@
 <h3 align="center">Valid JSON can still contain invalid arithmetic.<br>Review extracted invoices, investigate likely errors, and keep the evidence beside the numbers.</h3>
 
 <p align="center">
+  <a href="https://ledger-lint.vercel.app/"><b>Live demo ↗</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="#what-it-checks">What it checks</a> ·
   <a href="#why-a-number-is-wrong">Diagnosis</a> ·
