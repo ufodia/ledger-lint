@@ -1,0 +1,57 @@
+{
+  "name": "ledger-lint",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Validate AI-extracted invoice data: line math, tax, totals, IBAN, tax IDs, dates and duplicates, with explanations for every mismatch.",
+  "license": "MIT",
+  "author": "ufodia",
+  "homepage": "https://github.com/ufodia/ledger-lint#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ufodia/ledger-lint.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ufodia/ledger-lint/issues"
+  },
+  "funding": "https://buymeacoffee.com/ufodia",
+  "keywords": [
+    "invoice",
+    "document-ai",
+    "ocr",
+    "data-validation",
+    "accounting",
+    "iban",
+    "vat",
+    "typescript"
+  ],
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "postbuild": "npm run prepare:hosting",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "playwright test",
+    "check": "npm run typecheck && npm test && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare:hosting": "node scripts/prepare-hosting.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "lint-invoice": "tsx src/cli.ts",
+    "examples": "tsx scripts/write-examples.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.10.1",
+    "prettier": "3.10.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  }
+}
