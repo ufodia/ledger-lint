@@ -19,7 +19,7 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-8ab4ff?style=flat-square">
   <img alt="Invoices never uploaded" src="https://img.shields.io/badge/invoices-never_uploaded-5fd39a?style=flat-square">
   <img alt="Zero runtime dependencies" src="https://img.shields.io/badge/runtime_deps-0-6d8dff?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-67_unit_·_12_browser-ffc35c?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-67_unit_·_14_browser-ffc35c?style=flat-square">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square">
 </p>
 
@@ -263,7 +263,7 @@ Invoices round VAT either per line or on the total. A difference no larger than 
 ```bash
 npm run dev            # local development server
 npm run check          # strict typecheck, 67 tests and a production build
-npm run test:browser   # 12 Playwright tests in Chromium
+npm run test:browser   # 14 Playwright tests in Chromium
 npm run preview        # inspect the production build locally
 npm run lint-invoice -- examples/batch.json
 npm run examples       # rewrite examples/*.json from src/demo.ts

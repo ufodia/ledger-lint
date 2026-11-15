@@ -14,6 +14,29 @@ test('keyboard report navigation keeps focus on findings and filters', async ({ 
   await expect(page.locator('#input')).toBeFocused();
 });
 
+test('keyboard findings remain in view in short zoom-sized viewports', async ({ page }) => {
+  for (const viewport of [
+    { width: 640, height: 512 },
+    { width: 320, height: 256 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await demo(page, 'German agency invoice');
+    const check = page.locator('[id="finding-line-amount:lines[2].netAmount"]');
+    for (let i = 0; i < 100; i++) {
+      if (await check.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(check).toBeFocused();
+    for (let activation = 0; activation < 2; activation++) {
+      await page.keyboard.press('Enter');
+      await expect(check).toBeFocused();
+      // Both collapsing and reopening must keep the focused finding in view.
+      await page.waitForTimeout(1100);
+      await expect(check).toBeInViewport();
+    }
+  }
+});
+
 async function demo(page: Page, label: string) {
   await page.goto('/');
   await page.locator('#today').fill('2026-11-14');

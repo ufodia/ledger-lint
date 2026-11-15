@@ -165,8 +165,9 @@ function render() {
     verdictBar(r),
     h('div', { class: 'ws-grid' }, paper(r), panel(r)),
   );
-  if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
   document.querySelector('.fld.focus')?.scrollIntoView({ block: 'nearest' });
+  // A related invoice field must not scroll the focused finding out of view.
+  if (focusedId) document.getElementById(focusedId)?.focus();
 }
 
 function batchView(): HTMLElement {
