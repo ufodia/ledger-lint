@@ -281,6 +281,7 @@ Created and maintained by **[ufodia](https://github.com/ufodia)**, currently the
 
 <p align="center">
   <a href="https://buymeacoffee.com/ufodia"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="56"></a>
+  <a href="https://github.com/sponsors/ufodia">Support on GitHub Sponsors</a>
 </p>
 
 ## License
