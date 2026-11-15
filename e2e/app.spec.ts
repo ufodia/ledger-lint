@@ -1,6 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
+test('keyboard report navigation keeps focus on findings and filters', async ({ page }) => {
+  await demo(page, 'German agency invoice');
+  await expect(page.locator('#workspace h1')).toBeFocused();
+  await page.locator('#show-all').press('Enter');
+  await expect(page.locator('#show-all')).toBeFocused();
+  const check = page.locator('.finding').first();
+  const id = await check.getAttribute('id');
+  await check.press('Enter');
+  await expect(page.locator(`[id="${id}"]`)).toBeFocused();
+  await page.getByRole('button', { name: 'New check', exact: true }).press('Enter');
+  await expect(page.locator('#input')).toBeFocused();
+});
+
 async function demo(page: Page, label: string) {
   await page.goto('/');
   await page.locator('#today').fill('2026-11-14');

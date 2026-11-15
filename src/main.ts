@@ -90,6 +90,9 @@ function run(text: string) {
   intro.hidden = true;
   workspace.hidden = false;
   render();
+  const heading = workspace.querySelector<HTMLElement>('h1');
+  heading?.setAttribute('tabindex', '-1');
+  heading?.focus();
   window.scrollTo({ top: 0 });
 }
 
@@ -156,11 +159,13 @@ for (const demo of DEMOS)
 function render() {
   const r = results[current];
   if (!r) return;
+  const focusedId = workspace.contains(document.activeElement) ? document.activeElement?.id : '';
   workspace.replaceChildren(
     ...(results.length > 1 ? [batchView()] : []),
     verdictBar(r),
     h('div', { class: 'ws-grid' }, paper(r), panel(r)),
   );
+  if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
   document.querySelector('.fld.focus')?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -306,6 +311,7 @@ function verdictBar(r: LintResult): HTMLElement {
             workspace.hidden = true;
             workspace.replaceChildren();
             intro.hidden = false;
+            input.focus();
             window.scrollTo({ top: 0 });
           },
         },
@@ -362,7 +368,9 @@ function paper(r: LintResult): HTMLElement {
           : undefined,
       },
       content,
-      m?.n ? h('sup', { class: `marker s-${m.status}`, 'aria-label': `issue ${m.n}` }, String(m.n)) : null,
+      m?.n
+        ? h('sup', { class: `marker s-${m.status}`, role: 'img', 'aria-label': `issue ${m.n}` }, String(m.n))
+        : null,
     );
   };
   const party = (role: 'seller' | 'buyer') => {
@@ -574,12 +582,22 @@ function panel(r: LintResult): HTMLElement {
         { class: 'view-toggle', role: 'group', 'aria-label': 'Which checks to show' },
         h(
           'button',
-          { type: 'button', 'aria-pressed': String(!showAll), onclick: () => ((showAll = false), render()) },
+          {
+            id: 'show-problems',
+            type: 'button',
+            'aria-pressed': String(!showAll),
+            onclick: () => ((showAll = false), render()),
+          },
           `Problems & notes (${r.findings.filter((f) => f.status !== 'pass').length})`,
         ),
         h(
           'button',
-          { type: 'button', 'aria-pressed': String(showAll), onclick: () => ((showAll = true), render()) },
+          {
+            id: 'show-all',
+            type: 'button',
+            'aria-pressed': String(showAll),
+            onclick: () => ((showAll = true), render()),
+          },
           `All checks (${r.findings.length})`,
         ),
       ),
@@ -648,6 +666,7 @@ function findingItem(f: Finding, n?: number): HTMLElement {
       'button',
       {
         type: 'button',
+        id: `finding-${f.id}`,
         class: `finding s-${f.status} ${active ? 'active' : ''}`,
         'aria-expanded': String(active),
         onclick: () => {

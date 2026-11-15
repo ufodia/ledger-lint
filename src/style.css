@@ -725,7 +725,7 @@ dd.fld[class*='s-'] {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--st);
-  color: #fff;
+  color: var(--paper-ink);
   font: 700 0.68rem var(--sans);
   vertical-align: super;
   line-height: 1;
@@ -734,7 +734,8 @@ dd.fld[class*='s-'] {
   background: #e29a12;
 }
 .paper .marker.s-error {
-  background: #e5484d;
+  background: #ba2532;
+  color: #fff;
 }
 
 /* ——— Findings panel ——— */
